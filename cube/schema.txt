@@ -1,0 +1,46 @@
+CREATE TABLE asanaCategory (
+categoryID INTEGER PRIMARY KEY,
+name TEXT,
+description TEXT
+);
+
+CREATE TABLE categoryList (
+asanaID INTEGER,
+categoryID INTEGER,
+PRIMARY KEY (asanaID, categoryID)
+);
+
+CREATE TABLE asana (
+asanaID INTEGER PRIMARY KEY,
+sanskritName TEXT,
+englishName TEXT,
+userNotes TEXT,
+);
+
+CREATE TABLE pose (
+poseID INTEGER PRIMARY KEY,
+asanaID INTEGER
+);
+
+CREATE TABLE joint (
+jointID INTEGER,
+poseID INTEGER,
+upX REAL,
+upY REAL,
+upZ REAL,
+forwardX REAL,
+forwardY REAL,
+forwardZ REAL,
+originX REAL,
+originY REAL,
+originZ REAL,
+xAngle REAL,
+yAngle REAL,
+zAngle REAL,
+PRIMARY KEY (jointID, poseID)
+);
+
+INSERT INTO joint (jointID, poseID, upX, upY, upZ, forwardX, forwardY, forwardZ, originX, originY, originZ) VALUES ?
+
+UPDATE joint SET upX = ?, upY = ?, upZ = ?, forwardX = ?, forwardY = ?, forwardZ = ?, originX = ?, originY = ?, originZ = ? WHERE jointID = ? AND poseID = ?
+

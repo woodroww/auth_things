@@ -1,0 +1,17 @@
+[package]
+name = "yoga_matt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { workspace = true }
+bevy_mod_picking = "0.11.0"
+bevy-inspector-egui = "0.14.0"
+
+[dependencies.sqlx]
+version = "0.6.2"
+features = [
+	"runtime-actix-rustls",
+	"macros",
+	"sqlite",
+]
