@@ -37,8 +37,8 @@ fn pan_orbit_camera(
     mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
 ) {
     // change input mapping for orbit and panning here
-    let orbit_button = MouseButton::Right;
-    let pan_button = MouseButton::Middle;
+    let orbit_button = MouseButton::Left;
+    let pan_button = MouseButton::Right;
 
     let mut pan = Vec2::ZERO;
     let mut rotation_move = Vec2::ZERO;

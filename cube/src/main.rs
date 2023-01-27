@@ -14,10 +14,23 @@ use rusqlite::Connection;
 mod camera;
 
 #[derive(Component)]
-struct LoadButton;
+struct MainMenu;
+
+#[derive(Component)]
+struct AsanaName;
+
+#[derive(Component)]
+struct UpButton;
+#[derive(Component)]
+struct DownButton;
 
 #[derive(Resource)]
-struct YogaResources;
+pub struct YogaAssets {
+    font: Handle<Font>,
+    font_color: Color,
+    asanas: Vec<AsanaDB>,
+    current_idx: usize,
+}
 
 #[derive(Component)]
 struct Clickable;
@@ -28,7 +41,7 @@ struct Bone {
 }
 
 #[derive(Component)]
-struct VisibleAxis;
+struct BoneAxis;
 
 #[derive(Debug)]
 struct AsanaDB {
@@ -100,7 +113,8 @@ PRIMARY KEY (jointID, poseID)
 
 fn main() {
     App::new()
-        .insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
+        //.insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
+        .insert_resource(ClearColor(Color::hex("292929").unwrap()))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             window: WindowDescriptor {
                 title: "YogaMat".to_string(),
@@ -110,9 +124,8 @@ fn main() {
             },
             ..default()
         }))
-        .add_plugin(WorldInspectorPlugin)
-        .add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
-        .insert_resource(YogaResources)
+        //.add_plugin(WorldInspectorPlugin)
+        //.add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
         //.add_plugin(DebugCursorPickingPlugin) // <- Adds the debug cursor (optional)
@@ -121,28 +134,121 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_axis)
         .add_startup_system(setup_ui)
-        .add_system(button_clicked)
+        //.add_system(button_clicked)
+        .add_system(keyboard_input_system)
+        .add_startup_system_to_stage(StartupStage::PreStartup, load_resources)
         //.add_system(cube_click)
         .run();
 }
 
-fn button_clicked(
-    mut commands: Commands,
-    interactions: Query<&Interaction, (With<LoadButton>, Changed<Interaction>)>,
+
+fn load_resources(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(YogaAssets {
+        font: asset_server.load("fonts/Roboto-Regular.ttf"),
+        font_color: Color::rgb_u8(207, 207, 207),
+        asanas: get_asanas_from_db(),
+        current_idx: 0,
+    });
+}
+
+fn keyboard_input_system(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut yoga_assets: ResMut<YogaAssets>,
     mut bones: Query<(&mut Transform, &Bone)>,
+    mut asana_text: Query<&mut Text, With<AsanaName>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Up) {
+        yoga_assets.current_idx += 1;
+        if yoga_assets.current_idx > yoga_assets.asanas.len() - 1 {
+            yoga_assets.current_idx = 0;
+        }
+        let name = yoga_assets.asanas[yoga_assets.current_idx].sanskrit.clone();
+
+        let name_text = TextSection::new(
+            name.clone(),
+            TextStyle {
+                font: yoga_assets.font.clone(),
+                font_size: 24.0,
+                color: yoga_assets.font_color,
+            }
+        );
+
+        let mut change_me = asana_text.single_mut();
+        *change_me = Text::from_sections([name_text]);
+
+        let joints = load_pose(name);
+        for (mut transform, bone) in bones.iter_mut() {
+            let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
+            *transform = Transform::from_matrix(mat.mat);
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::Down) {
+        if yoga_assets.current_idx == 0 {
+            yoga_assets.current_idx = yoga_assets.asanas.len() - 1;
+        } else {
+            yoga_assets.current_idx -= 1;
+        }
+        let name = yoga_assets.asanas[yoga_assets.current_idx].sanskrit.clone();
+
+        let name_text = TextSection::new(
+            name.clone(),
+            TextStyle {
+                font: yoga_assets.font.clone(),
+                font_size: 24.0,
+                color: yoga_assets.font_color,
+            }
+        );
+
+        let mut change_me = asana_text.single_mut();
+        *change_me = Text::from_sections([name_text]);
+        let joints = load_pose(name);
+        for (mut transform, bone) in bones.iter_mut() {
+            let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
+            *transform = Transform::from_matrix(mat.mat);
+        }
+    }
+}
+
+fn button_clicked(
+    //mut commands: Commands,
+    interactions: Query<&Interaction, (With<UpButton>, Changed<Interaction>)>,
+    mut bones: Query<(&mut Transform, &Bone)>,
+    mut yoga_assets: ResMut<YogaAssets>,
 ) {
     for interaction in &interactions {
         if matches!(interaction, Interaction::Clicked) {
-            println!("button");
             // Utpluthi Tadasana Hanumanasana
-            let joints = load_pose("Utpluthi".to_string());
-            println!("got {} joints", joints.len());
+            if yoga_assets.current_idx > yoga_assets.asanas.len() - 1 {
+                yoga_assets.current_idx = 0;
+            }
+            let name = yoga_assets.asanas[yoga_assets.current_idx].sanskrit.clone();
+            let joints = load_pose(name);
             for (mut transform, bone) in bones.iter_mut() {
                 let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
                 *transform = Transform::from_matrix(mat.mat);
             }
+            yoga_assets.current_idx += 1;
         }
     }
+}
+
+fn get_asanas_from_db() -> Vec<AsanaDB> {
+    let path = "./yogamatdb.sql";
+    let db = Connection::open(path).expect("couldn't open database");
+    let sql = "select * from asana";
+    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
+    let response = stmt.query_map([], |row| {
+        Ok(AsanaDB {
+            asana_id: row.get(0).expect("so may results"),
+            sanskrit: row.get(1).expect("so may results"),
+            english: row.get(2).expect("so may results"),
+            notes: row.get(3).expect("so may results"),
+        })
+    }).expect("bad");
+    let asanas = response.filter_map(|result| result.ok()).collect::<Vec<AsanaDB>>();
+    //println!("Found {} asanas", asanas.len());
+    asanas
 }
 
 fn load_pose(sanskrit: String) -> Vec<JointMatrix> {
@@ -161,10 +267,6 @@ fn load_pose(sanskrit: String) -> Vec<JointMatrix> {
     }).expect("bad");
     let asanas = response.filter_map(|result| result.ok()).collect::<Vec<AsanaDB>>();
 
-    for asana in &asanas {
-        println!("Found asana {:?}", asana);
-    }
-
     let sql = format!("select poseId from pose where asanaID = {};", asanas[0].asana_id);
     let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
     let response = stmt.query_map([], |row| {
@@ -173,8 +275,6 @@ fn load_pose(sanskrit: String) -> Vec<JointMatrix> {
     }).expect("bad");
     let pose_ids = response.filter_map(|result| result.ok()).collect::<Vec<i32>>();
     
-    println!("pose id {}", pose_ids[0]);
-
     let sql = format!("select * from joint where poseID = {};", pose_ids[0]);
     let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
     let response = stmt.query_map([], |row| {
@@ -359,7 +459,7 @@ fn skelly() -> HashMap<String, BoneCube> {
             z_bottom: 12.0,
             y: head_length,
             inset: 2.5,
-            transform: Transform::from_xyz(0.0, head_length / 2.0, 0.0),
+            transform: Transform::from_xyz(0.0, -head_length / 2.0, 0.0),
         },
     );
 
@@ -942,7 +1042,7 @@ fn spawn_skeleton(
     let name = "Head".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
     let mut transform = Transform::IDENTITY;
-    transform.translation += Vec3::new(0.0, 0.0, 0.0);
+    transform.translation += Vec3::new(0.0, c_spine_length / 7.0, 0.0);
     let mesh = make_bone_mesh(bone);
     let head = commands.entity(c7).add_children(|parent| {
         parent
@@ -1172,7 +1272,7 @@ fn spawn_skeleton(
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 0.5,
+        brightness: 0.1,
     });
     /*
     commands.spawn(PointLightBundle {
@@ -1189,17 +1289,20 @@ fn spawn_skeleton(
 
 fn setup_ui(
     mut commands: Commands,
+    my_assets: Res<YogaAssets>,
 ) {
     commands
         .spawn(NodeBundle {
             style: Style {
                 size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-                justify_content: JustifyContent::Center,
+                justify_content: JustifyContent::FlexStart,
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
             ..default()
         })
+        .insert(MainMenu)
+        .insert(Name::new("Yoga Menu"))
         .with_children(|commands| {
             commands.spawn(TextBundle {
                 style: Style {
@@ -1208,51 +1311,54 @@ fn setup_ui(
                     ..default()
                 },
                 text: Text::from_section(
-                    "Asanas yogaMat !!!",
+                    "YogaMat Lives!",
                     TextStyle {
-                        //font: my_assets.font.clone(),
-                        font_size: 70.0,
-                        //color: my_assets.color,
+                        font: my_assets.font.clone(),
+                        font_size: 30.0,
+                        color: my_assets.font_color,
                         ..Default::default()
                     },
                 ),
                 ..default()
             })
-            .insert(Name::new("GameTitle"));
+            .insert(AsanaName)
+            .insert(Name::new("AsanaName"));
 
-    let button_margin = UiRect::all(Val::Percent(2.0));
+            /*
+        let button_margin = UiRect::all(Val::Percent(2.0));
         commands
             .spawn(ButtonBundle {
                 style: Style {
-                    size: Size::new(Val::Px(91.0), Val::Px(91.0)),
-                    align_self: AlignSelf::Center,
-                    justify_content: JustifyContent::Center,
+                    size: Size::new(Val::Px(80.0), Val::Px(40.0)),
+                    align_self: AlignSelf::FlexEnd,
+                    justify_content: JustifyContent::FlexEnd,
                     margin: button_margin,
                     ..default()
                 },
                 //image: img.into(),
                 ..default()
-            }).insert(LoadButton)
+            }).insert(UpButton)
             .with_children(|commands| {
                 commands.spawn(TextBundle {
                     style: Style {
-                        align_self: AlignSelf::FlexStart,
+                        align_self: AlignSelf::Center,
+                        justify_content: JustifyContent::Center,
                         margin: UiRect::all(Val::Percent(3.0)),
-                        position: UiRect::new(Val::Px(0.0), Val::Px(-110.0), Val::Px(20.0), Val::Px(0.0)),
                         ..default()
                     },
                     text: Text::from_section(
                         "load me",
                         TextStyle {
-                            //font: my_assets.font.clone(),
-                            font_size: 44.0,
-                            //color: my_assets.color,
+                            font: my_assets.font.clone(),
+                            font_size: 18.0,
+                            color: my_assets.font_color,
                             ..Default::default()
                         },
                     ),
                     ..default()
                 });
             });
+            */
         });
 }
 
@@ -1261,7 +1367,7 @@ fn spawn_bone_axis(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
-    let length = 15.0;
+    let length = 7.0;
     let width = 0.1;
     //let x = Box::new(x_length, y_length, z_length);
     let x = shape::Box::new(length, width, width);
@@ -1285,11 +1391,11 @@ fn spawn_bone_axis(
                     mesh: meshes.add(Mesh::from(x)),
                     material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
                     transform,
-                    //visibility: Visibility { is_visible: false },
+                    visibility: Visibility { is_visible: false },
                     ..default()
                 },
                 NotShadowCaster,
-                VisibleAxis,
+                BoneAxis,
             ))
             .insert(Name::from("x axis"));
         let mut transform = Transform::default();
@@ -1300,11 +1406,11 @@ fn spawn_bone_axis(
                     mesh: meshes.add(Mesh::from(y)),
                     material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
                     transform,
-                    //visibility: Visibility { is_visible: false },
+                    visibility: Visibility { is_visible: false },
                     ..default()
                 },
                 NotShadowCaster,
-                VisibleAxis,
+                BoneAxis,
             ))
             .insert(Name::from("y axis"));
         let mut transform = Transform::default();
@@ -1315,11 +1421,11 @@ fn spawn_bone_axis(
                     mesh: meshes.add(Mesh::from(z)),
                     material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
                     transform,
-                    //visibility: Visibility { is_visible: false },
+                    visibility: Visibility { is_visible: false },
                     ..default()
                 },
                 NotShadowCaster,
-                VisibleAxis,
+                BoneAxis,
             ))
             .insert(Name::from("z axis"));
     });
@@ -1360,7 +1466,7 @@ fn spawn_axis(
                     ..default()
                 },
                 NotShadowCaster,
-                VisibleAxis,
+                BoneAxis,
             ))
             .insert(Name::from("x axis"));
         let mut transform = Transform::default();
@@ -1375,7 +1481,7 @@ fn spawn_axis(
                     ..default()
                 },
                 NotShadowCaster,
-                VisibleAxis,
+                BoneAxis,
             ))
             .insert(Name::from("y axis"));
         let mut transform = Transform::default();
@@ -1390,7 +1496,7 @@ fn spawn_axis(
                     ..default()
                 },
                 NotShadowCaster,
-                VisibleAxis,
+                BoneAxis,
             ))
             .insert(Name::from("z axis"));
     });
