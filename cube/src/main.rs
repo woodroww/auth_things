@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 use bevy::{
+    pbr::NotShadowCaster,
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
+    tasks::AsyncComputeTaskPool,
 };
 use bevy_mod_picking::*;
 use camera::{CameraPlugin, PanOrbitCamera};
@@ -19,7 +21,7 @@ fn main() {
         .insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             window: WindowDescriptor {
-                title: "Default Cube".to_string(),
+                title: "YogaMat".to_string(),
                 width: 800.0,
                 height: 800.0,
                 ..default()
@@ -29,6 +31,7 @@ fn main() {
         .add_plugin(WorldInspectorPlugin::new())
         .add_startup_system(spawn_cubes)
         .add_startup_system(spawn_camera)
+        .add_startup_system(spawn_axis)
         //.add_startup_system(setup_database)
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
@@ -39,6 +42,9 @@ fn main() {
 }
 
 /*
+fn dooooo() {
+    //let jam = AsyncComputeTaskPool;
+}
 async fn setup_database() {
     //let conn = SqliteConnection::connect("sqlite::memory:").await?;
 
@@ -91,7 +97,7 @@ fn skelly() -> HashMap<String, BoneCube> {
     let c_spine_length = 8.0;
     let t_spine_length = 19.0;
     let l_spine_length = 9.0;
-    let hip_length = 12.0; // then 6.0; // half transofrm y was -4.0
+    let hip_length = 6.0; // half transofrm y was -4.0
     let femur_length = 29.0;
     let calf_length = 26.0;
     let foot_length = 15.0;
@@ -108,9 +114,9 @@ fn skelly() -> HashMap<String, BoneCube> {
             x_bottom: 13.0,
             z_top: 6.0,
             z_bottom: 4.0,
-            y: hip_length,
+            y: 12.0,
             inset: 1.0,
-            transform: Transform::from_xyz(0.0, -hip_length / 2.0, 0.0),
+            transform: Transform::from_xyz(0.0, -4.0, 0.0),
         },
     );
 
@@ -395,6 +401,12 @@ fn make_bone_mesh(cube: &BoneCube) -> Mesh {
 	corners.push([half_xbottom, -y/2.0+inset, -half_zbottom+inset]);
 	corners.push([half_xtop, y/2.0-inset, -half_ztop+inset]);
 
+    for corner in corners.iter_mut() {
+        corner[0] += cube.transform.translation.x;
+        corner[1] += cube.transform.translation.y;
+        corner[2] += cube.transform.translation.z;
+    }
+
 	let indices/*[108+24]*/ = [
 		// 12 faces
 		0,3,2, 0,2,1,			// top
@@ -519,25 +531,26 @@ fn spawn_cubes(
     let skeleton_parts = skelly();
     let name = "Hips".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
-    let transform = bone.transform;
     let mesh = make_bone_mesh(bone);
     let hips = commands
         .spawn(PbrBundle {
             mesh: meshes.add(mesh),
             material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
-            transform,
             ..default()
         })
         .insert(PickableBundle::default())
         .insert(Clickable)
         .insert(Name::from(name))
         .id();
+    commands.entity(hips).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
+    });
 
     let prev = bone;
     let name = "Left Femur".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
-    let mut transform = bone.transform;
-    transform.translation += Vec3::new(7.5, -prev.y / 2.0, 1.55);
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(7.5, -prev.y, 1.55);
     let mesh = make_bone_mesh(bone);
     let left_femur = commands.entity(hips).add_children(|parent| {
         parent
@@ -552,45 +565,54 @@ fn spawn_cubes(
             .insert(Name::from(name))
             .id()
     });
+    commands.entity(left_femur).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
+    });
 
     let prev = bone;
     let name = "Left Calf".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
-    let mut transform = bone.transform;
-    transform.translation += Vec3::new(0.0, -prev.y / 2.0, 0.0);
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let left_calf = commands
-        .entity(left_femur)
-        .add_children(|parent| {
-            parent
-                .spawn(PbrBundle {
-                    mesh: meshes.add(mesh),
-                    material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
-                    transform,
-                    ..default()
-                })
-                .insert(PickableBundle::default())
-                .insert(Clickable)
-                .insert(Name::from(name)).id()
-        });
-
-    let prev = bone;
-    let name = "Left Foot".to_string();
-    let bone = skeleton_parts.get(&name).unwrap();
-    let mut transform = bone.transform;
-    transform.translation += Vec3::new(0.0, -prev.y / 2.0, 0.0);
-    let mesh = make_bone_mesh(bone);
-    let left_foot =
-        commands.entity(left_calf).add_children(|parent| {
-            parent.spawn(PbrBundle {
+    let left_calf = commands.entity(left_femur).add_children(|parent| {
+        parent
+            .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
                 material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
                 transform,
                 ..default()
             })
-        .insert(PickableBundle::default())
-        .insert(Clickable)
-        .insert(Name::from(name)).id()
+            .insert(PickableBundle::default())
+            .insert(Clickable)
+            .insert(Name::from(name))
+            .id()
+    });
+    commands.entity(left_calf).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
+    });
+
+    let prev = bone;
+    let name = "Left Foot".to_string();
+    let bone = skeleton_parts.get(&name).unwrap();
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -prev.y, 0.0);
+    let mesh = make_bone_mesh(bone);
+    let left_foot = commands.entity(left_calf).add_children(|parent| {
+        parent
+            .spawn(PbrBundle {
+                mesh: meshes.add(mesh),
+                material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
+                transform,
+                ..default()
+            })
+            .insert(PickableBundle::default())
+            .insert(Clickable)
+            .insert(Name::from(name))
+            .id()
+    });
+    commands.entity(left_foot).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
 
     let name = "Hips".to_string();
@@ -598,58 +620,70 @@ fn spawn_cubes(
     let prev = bone;
     let name = "Right Femur".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
-    let mut transform = bone.transform;
-    transform.translation += Vec3::new(-7.5, -prev.y / 2.0, 1.55);
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(-7.5, -prev.y, 1.55);
     let mesh = make_bone_mesh(bone);
-    let right_femur =
-        commands.entity(hips).add_children(|parent| {
-            parent.spawn(PbrBundle {
+    let right_femur = commands.entity(hips).add_children(|parent| {
+        parent
+            .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
                 material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
                 transform,
                 ..default()
             })
-        .insert(PickableBundle::default())
-        .insert(Clickable)
-        .insert(Name::from(name)).id()
+            .insert(PickableBundle::default())
+            .insert(Clickable)
+            .insert(Name::from(name))
+            .id()
+    });
+    commands.entity(right_femur).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
 
     let prev = bone;
     let name = "Right Calf".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
-    let mut transform = bone.transform;
-    transform.translation += Vec3::new(0.0, -prev.y / 2.0, 0.0);
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let right_calf =
-        commands.entity(right_femur).add_children(|parent| {
-            parent.spawn(PbrBundle {
+    let right_calf = commands.entity(right_femur).add_children(|parent| {
+        parent
+            .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
                 material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
                 transform,
                 ..default()
             })
-        .insert(PickableBundle::default())
-        .insert(Clickable)
-        .insert(Name::from(name)).id()
+            .insert(PickableBundle::default())
+            .insert(Clickable)
+            .insert(Name::from(name))
+            .id()
+    });
+    commands.entity(right_calf).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
 
     let prev = bone;
     let name = "Right Foot".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
-    let mut transform = bone.transform;
-    transform.translation += Vec3::new(0.0, -prev.y / 2.0, 0.0);
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let right_foot =
-        commands.entity(right_calf).add_children(|parent| {
-            parent.spawn(PbrBundle {
+    let right_foot = commands.entity(right_calf).add_children(|parent| {
+        parent
+            .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
                 material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
                 transform,
                 ..default()
             })
-        .insert(PickableBundle::default())
-        .insert(Clickable)
-        .insert(Name::from(name)).id()
+            .insert(PickableBundle::default())
+            .insert(Clickable)
+            .insert(Name::from(name))
+            .id()
+    });
+    commands.entity(right_foot).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
 
     let name = "Hips".to_string();
@@ -660,25 +694,26 @@ fn spawn_cubes(
     let l_spine_length = 9.0;
 
     for i in (1..=5).rev() {
-        let mut transform = bone.transform;
+        let mut transform = Transform::IDENTITY;
         if i == 5 {
-            transform.translation += Vec3::new(0.0, prev.y, 0.0);
+            transform.translation += Vec3::new(0.0, 0.0, 0.0);
             println!("here");
         } else {
-            transform.translation += Vec3::new(0.0, l_spine_length / 5.0, 0.0);
+            transform.translation += Vec3::new(0.0, -l_spine_length / 5.0, 0.0);
         }
         let mesh = make_bone_mesh(bone);
-        let lumbar =
-            commands.entity(prev_entity).add_children(|parent| {
-                parent.spawn(PbrBundle {
+        let lumbar = commands.entity(prev_entity).add_children(|parent| {
+            parent
+                .spawn(PbrBundle {
                     mesh: meshes.add(mesh),
                     material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
                     transform,
                     ..default()
                 })
-            .insert(PickableBundle::default())
-            .insert(Clickable)
-            .insert(Name::from(format!("{} {}", name, i))).id()
+                .insert(PickableBundle::default())
+                .insert(Clickable)
+                .insert(Name::from(format!("{} {}", name, i)))
+                .id()
         });
         prev_entity = lumbar;
     }
@@ -779,4 +814,147 @@ fn spawn_cubes(
         ..default()
     });
     */
+}
+
+#[derive(Component)]
+struct VisibleAxis;
+
+fn spawn_bone_axis(
+    commands: &mut ChildBuilder,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    let length = 15.0;
+    let width = 0.1;
+    //let x = Box::new(x_length, y_length, z_length);
+    let x = shape::Box::new(length, width, width);
+    let y = shape::Box::new(width, length, width);
+    let z = shape::Box::new(width, width, length);
+
+    let mut empty = commands.spawn_empty();
+    empty
+        .insert(TransformBundle::from_transform(Transform::IDENTITY))
+        .insert(Visibility::default())
+        .insert(ComputedVisibility::default())
+        .insert(Name::from("bone axis"));
+
+    let mut transform = Transform::default();
+    transform.translation.x = length / 2.0;
+
+    empty.add_children(|parent| {
+        parent
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(x)),
+                    material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
+                    transform,
+                    //visibility: Visibility { is_visible: false },
+                    ..default()
+                },
+                NotShadowCaster,
+                VisibleAxis,
+            ))
+            .insert(Name::from("x axis"));
+        let mut transform = Transform::default();
+        transform.translation.y = length / 2.0;
+        parent
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(y)),
+                    material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+                    transform,
+                    //visibility: Visibility { is_visible: false },
+                    ..default()
+                },
+                NotShadowCaster,
+                VisibleAxis,
+            ))
+            .insert(Name::from("y axis"));
+        let mut transform = Transform::default();
+        transform.translation.z = length / 2.0;
+        parent
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(z)),
+                    material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
+                    transform,
+                    //visibility: Visibility { is_visible: false },
+                    ..default()
+                },
+                NotShadowCaster,
+                VisibleAxis,
+            ))
+            .insert(Name::from("z axis"));
+    });
+}
+
+fn spawn_axis(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let length = 200.0;
+    let width = 0.1;
+    //let x = Box::new(x_length, y_length, z_length);
+    let x = shape::Box::new(length, width, width);
+    let y = shape::Box::new(width, length, width);
+    let z = shape::Box::new(width, width, length);
+
+    let empty_transform = Transform::from_translation(Vec3::ZERO);
+    let empty: Entity = commands
+        .spawn_empty()
+        .insert(TransformBundle::from_transform(empty_transform))
+        .insert(Visibility::default())
+        .insert(ComputedVisibility::default())
+        .insert(Name::from("Main Axis"))
+        .id();
+
+    let mut transform = Transform::default();
+    transform.translation.x = length / 2.0;
+
+    commands.entity(empty).add_children(|parent| {
+        parent
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(x)),
+                    material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
+                    transform,
+                    visibility: Visibility { is_visible: false },
+                    ..default()
+                },
+                NotShadowCaster,
+                VisibleAxis,
+            ))
+            .insert(Name::from("x axis"));
+        let mut transform = Transform::default();
+        transform.translation.y = length / 2.0;
+        parent
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(y)),
+                    material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
+                    transform,
+                    visibility: Visibility { is_visible: false },
+                    ..default()
+                },
+                NotShadowCaster,
+                VisibleAxis,
+            ))
+            .insert(Name::from("y axis"));
+        let mut transform = Transform::default();
+        transform.translation.z = length / 2.0;
+        parent
+            .spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(z)),
+                    material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
+                    transform,
+                    visibility: Visibility { is_visible: false },
+                    ..default()
+                },
+                NotShadowCaster,
+                VisibleAxis,
+            ))
+            .insert(Name::from("z axis"));
+    });
 }
