@@ -4,15 +4,17 @@ use bevy::{
     pbr::NotShadowCaster,
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
-    tasks::AsyncComputeTaskPool,
 };
 use bevy_mod_picking::*;
 use camera::{CameraPlugin, PanOrbitCamera};
-//use sqlx::SqliteConnection;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_inspector_egui::quick::{ResourceInspectorPlugin, AssetInspectorPlugin, FilterQueryInspectorPlugin};
+use bevy_inspector_egui::quick::FilterQueryInspectorPlugin;
+use rusqlite::Connection;
 
 mod camera;
+
+#[derive(Resource)]
+struct YogaResources;
 
 #[derive(Component)]
 struct Clickable;
@@ -31,10 +33,11 @@ fn main() {
         }))
         .add_plugin(WorldInspectorPlugin)
         .add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
+        .insert_resource(YogaResources)
         .add_startup_system(spawn_cubes)
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_axis)
-        //.add_startup_system(setup_database)
+        .add_startup_system(setup_database)
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
         //.add_plugin(DebugCursorPickingPlugin) // <- Adds the debug cursor (optional)
@@ -47,19 +50,81 @@ fn main() {
 fn dooooo() {
     //let jam = AsyncComputeTaskPool;
 }
-async fn setup_database() {
-    //let conn = SqliteConnection::connect("sqlite::memory:").await?;
+*/
+
+#[derive(Debug)]
+struct AsanaDB {
+    asana_id: i32,
+    sanskrit: String,
+    english: String,
+    notes: Option<String>,
+}
+
+fn setup_database() {
 
     // CREATE TABLE asana (asanaID INTEGER PRIMARY KEY, sanskritName TEXT, englishName TEXT, userNotes TEXT);
-
     // CREATE TABLE pose ( poseID INTEGER PRIMARY KEY, asanaID INTEGER);
 
-    let sql = "select * from asana where sanskritName = 'Tadasana'";
     // 152|Tadasana|Mountain|
-    let asana_id = "select asanaID from asana where sanskritName = 'Tadasana';";
-    let pose_id = "select poseId from pose where asanaID = 152;";
     let joint_data = "select * from joint where poseID = 152;"; // 152-poseID
+
+    let path = "./yogamatdb.sql";
+    let db = Connection::open(path).expect("couldn't open database");
+
+    let sql = "select * from asana where sanskritName = 'Tadasana'";
+    let mut stmt = db.prepare(sql).expect("trouble preparing statement");
+    let response = stmt.query_map([], |row| {
+        Ok(AsanaDB {
+            asana_id: row.get(0).expect("so may results"),
+            sanskrit: row.get(1).expect("so may results"),
+            english: row.get(2).expect("so may results"),
+            notes: row.get(3).expect("so may results"),
+        })
+    }).expect("bad");
+    let asanas = response.filter_map(|result| result.ok()).collect::<Vec<AsanaDB>>();
+
+    for asana in &asanas {
+        println!("Found asana {:?}", asana);
+    }
+
+    let sql = format!("select poseId from pose where asanaID = {};", asanas[0].asana_id);
+    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
+    let response = stmt.query_map([], |row| {
+        let pose_id: i32 = row.get(0).expect("so may results");
+        Ok(pose_id)
+    }).expect("bad");
+    let pose_ids = response.filter_map(|result| result.ok()).collect::<Vec<i32>>();
+    
+    println!("pose id {}", pose_ids[0]);
+
+    let sql = format!("select * from joint where poseID = {};", pose_ids[0]);
+    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
+    let response = stmt.query_map([], |row| {
+        Ok(Joint {
+            joint_id: row.get(0).expect("so may results"),
+            pose_id: row.get(1).expect("so may results"),
+            up_x: row.get(2).expect("so may results"),
+            up_y: row.get(3).expect("so may results"),
+            up_z: row.get(4).expect("so may results"),
+            forward_x: row.get(5).expect("so may results"),
+            forward_y: row.get(6).expect("so may results"),
+            forward_z: row.get(7).expect("so may results"),
+            origin_x: row.get(8).expect("so may results"),
+            origin_y: row.get(9).expect("so may results"),
+            origin_z: row.get(10).expect("so may results"),
+            angle_x: row.get(11).expect("so may results"),
+            angle_y: row.get(12).expect("so may results"),
+            angle_z: row.get(13).expect("so may results"),
+            ..Default::default()
+        })
+    }).expect("bad");
+    let joints = response.filter_map(|result| result.ok()).collect::<Vec<Joint>>();
+    println!("got {} joints", joints.len());
+
 }
+
+
+/*
 CREATE TABLE joint (
 jointID INTEGER,
 poseID INTEGER,
@@ -504,6 +569,49 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
+#[derive(Default)]
+struct Joint {
+    joint_id: i32,
+    pose_id: i32,
+    up_x: f32,
+    up_y: f32,
+    up_z: f32,
+    forward_x: f32,
+    forward_y: f32,
+    forward_z: f32,
+    origin_x: f32,
+    origin_y: f32,
+    origin_z: f32,
+    angle_x: f32,
+    angle_y: f32,
+    angle_z: f32,
+}
+
+fn matrix_from_frame(frame: &Joint) -> Mat4 {
+    Mat4 {
+        x_axis: Vec4::new(
+            (frame.up_y * frame.forward_z) - (frame.up_z * frame.forward_y),
+            (frame.up_z * frame.forward_x) - (frame.up_x * frame.forward_z),
+            (frame.up_x * frame.forward_y) - (frame.up_y * frame.forward_x),
+            0.0),
+        y_axis: Vec4::new(
+            frame.up_x,
+            frame.up_y,
+            frame.up_z,
+            0.0),
+        z_axis: Vec4::new(
+            frame.forward_x,
+            frame.forward_y,
+            frame.forward_z,
+            0.0),
+        w_axis: Vec4::new(
+            frame.origin_x,
+            frame.origin_y,
+            frame.origin_z,
+            1.0),
+    }
+}
+
 #[derive(Component)]
 struct Bone;
 
@@ -551,6 +659,8 @@ fn spawn_cubes(
     commands.entity(hips).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+
+
 
     let prev = bone;
     let name = "Left Femur".to_string();
