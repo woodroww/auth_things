@@ -129,13 +129,18 @@ fn main() {
 fn button_clicked(
     mut commands: Commands,
     interactions: Query<&Interaction, (With<LoadButton>, Changed<Interaction>)>,
-    menu_root: Query<Entity, With<LoadButton>>,
+    mut bones: Query<(&mut Transform, &Bone)>,
 ) {
     for interaction in &interactions {
         if matches!(interaction, Interaction::Clicked) {
             println!("button");
-            let joints = load_pose("Tadasana".to_string());
+            // Utpluthi Tadasana Hanumanasana
+            let joints = load_pose("Utpluthi".to_string());
             println!("got {} joints", joints.len());
+            for (mut transform, bone) in bones.iter_mut() {
+                let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
+                *transform = Transform::from_matrix(mat.mat);
+            }
         }
     }
 }
