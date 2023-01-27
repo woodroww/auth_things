@@ -13,11 +13,90 @@ use rusqlite::Connection;
 
 mod camera;
 
+#[derive(Component)]
+struct LoadButton;
+
 #[derive(Resource)]
 struct YogaResources;
 
 #[derive(Component)]
 struct Clickable;
+
+#[derive(Component)]
+struct Bone {
+    id: i32,
+}
+
+#[derive(Component)]
+struct VisibleAxis;
+
+#[derive(Debug)]
+struct AsanaDB {
+    asana_id: i32,
+    sanskrit: String,
+    english: String,
+    notes: Option<String>,
+}
+
+struct JointMatrix {
+    mat: Mat4,
+    joint_id: i32,
+}
+
+struct BoneCube {
+    x_top: f32,
+    x_bottom: f32,
+    z_top: f32,
+    z_bottom: f32,
+    y: f32,
+    inset: f32,
+    transform: Transform,
+}
+
+#[derive(Default)]
+struct Joint {
+    joint_id: i32,
+    pose_id: i32,
+    up_x: f32,
+    up_y: f32,
+    up_z: f32,
+    forward_x: f32,
+    forward_y: f32,
+    forward_z: f32,
+    origin_x: f32,
+    origin_y: f32,
+    origin_z: f32,
+    angle_x: f32,
+    angle_y: f32,
+    angle_z: f32,
+}
+
+/*
+CREATE TABLE asana (asanaID INTEGER PRIMARY KEY, sanskritName TEXT, englishName TEXT, userNotes TEXT);
+CREATE TABLE pose ( poseID INTEGER PRIMARY KEY, asanaID INTEGER);
+152|Tadasana|Mountain|
+
+CREATE TABLE joint (
+jointID INTEGER,
+poseID INTEGER,
+upX REAL,
+upY REAL,
+upZ REAL,
+forwardX REAL,
+forwardY REAL,
+forwardZ REAL,
+originX REAL,
+originY REAL,
+originZ REAL,
+xAngle REAL,
+yAngle REAL,
+zAngle REAL,
+PRIMARY KEY (jointID, poseID)
+);
+*/
+
+
+
 
 fn main() {
     App::new()
@@ -34,45 +113,39 @@ fn main() {
         .add_plugin(WorldInspectorPlugin)
         .add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
         .insert_resource(YogaResources)
-        .add_startup_system(spawn_cubes)
-        .add_startup_system(spawn_camera)
-        .add_startup_system(spawn_axis)
-        .add_startup_system(setup_database)
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
         //.add_plugin(DebugCursorPickingPlugin) // <- Adds the debug cursor (optional)
         //.add_plugin(DebugEventsPickingPlugin) // <- Adds debug event logging (optional)
-        .add_system(cube_click)
+        .add_startup_system(spawn_skeleton)
+        .add_startup_system(spawn_camera)
+        .add_startup_system(spawn_axis)
+        .add_startup_system(setup_ui)
+        .add_system(button_clicked)
+        //.add_system(cube_click)
         .run();
 }
 
-/*
-fn dooooo() {
-    //let jam = AsyncComputeTaskPool;
+fn button_clicked(
+    mut commands: Commands,
+    interactions: Query<&Interaction, (With<LoadButton>, Changed<Interaction>)>,
+    menu_root: Query<Entity, With<LoadButton>>,
+) {
+    for interaction in &interactions {
+        if matches!(interaction, Interaction::Clicked) {
+            println!("button");
+            let joints = load_pose("Tadasana".to_string());
+            println!("got {} joints", joints.len());
+        }
+    }
 }
-*/
 
-#[derive(Debug)]
-struct AsanaDB {
-    asana_id: i32,
-    sanskrit: String,
-    english: String,
-    notes: Option<String>,
-}
-
-fn setup_database() {
-
-    // CREATE TABLE asana (asanaID INTEGER PRIMARY KEY, sanskritName TEXT, englishName TEXT, userNotes TEXT);
-    // CREATE TABLE pose ( poseID INTEGER PRIMARY KEY, asanaID INTEGER);
-
-    // 152|Tadasana|Mountain|
-    let joint_data = "select * from joint where poseID = 152;"; // 152-poseID
-
+fn load_pose(sanskrit: String) -> Vec<JointMatrix> {
     let path = "./yogamatdb.sql";
     let db = Connection::open(path).expect("couldn't open database");
 
-    let sql = "select * from asana where sanskritName = 'Tadasana'";
-    let mut stmt = db.prepare(sql).expect("trouble preparing statement");
+    let sql = format!("select * from asana where sanskritName = '{}'", sanskrit);
+    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
     let response = stmt.query_map([], |row| {
         Ok(AsanaDB {
             asana_id: row.get(0).expect("so may results"),
@@ -115,47 +188,15 @@ fn setup_database() {
             angle_x: row.get(11).expect("so may results"),
             angle_y: row.get(12).expect("so may results"),
             angle_z: row.get(13).expect("so may results"),
-            ..Default::default()
         })
     }).expect("bad");
     let joints = response.filter_map(|result| result.ok()).collect::<Vec<Joint>>();
-    println!("got {} joints", joints.len());
+    let mats = joints.iter().map(|joint| JointMatrix {
+        mat: matrix_from_frame(joint),
+        joint_id: joint.joint_id,
+    }).collect::<Vec<JointMatrix>>();
 
-}
-
-
-/*
-CREATE TABLE joint (
-jointID INTEGER,
-poseID INTEGER,
-upX REAL,
-upY REAL,
-upZ REAL,
-forwardX REAL,
-forwardY REAL,
-forwardZ REAL,
-originX REAL,
-originY REAL,
-originZ REAL,
-xAngle REAL,
-yAngle REAL,
-zAngle REAL,
-PRIMARY KEY (jointID, poseID)
-);
-
-
-
-    bone polygons from Bone.m sharedPolygonWithName
-*/
-
-struct BoneCube {
-    x_top: f32,
-    x_bottom: f32,
-    z_top: f32,
-    z_bottom: f32,
-    y: f32,
-    inset: f32,
-    transform: Transform,
+    mats
 }
 
 fn skelly() -> HashMap<String, BoneCube> {
@@ -514,12 +555,11 @@ fn make_bone_mesh(cube: &BoneCube) -> Mesh {
     mesh.set_indices(Some(indices));
     mesh
 }
-
+/*
 fn cube_click(
     selection: Query<(&Transform, &Selection)>,
     mut camera: Query<(&mut PanOrbitCamera, &Transform)>,
 ) {
-    /*
     if !selection.iter().any(|(_, selection)| selection.selected()) {
         return;
     }
@@ -539,8 +579,8 @@ fn cube_click(
     let (mut camera, camera_transform) = camera.single_mut();
     camera.radius = (camera_transform.translation - center).length();
     camera.focus = center;
-    */
 }
+*/
 
 fn spawn_camera(mut commands: Commands) {
     let focus: Vec3 = Vec3::ZERO;
@@ -569,24 +609,6 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
-#[derive(Default)]
-struct Joint {
-    joint_id: i32,
-    pose_id: i32,
-    up_x: f32,
-    up_y: f32,
-    up_z: f32,
-    forward_x: f32,
-    forward_y: f32,
-    forward_z: f32,
-    origin_x: f32,
-    origin_y: f32,
-    origin_z: f32,
-    angle_x: f32,
-    angle_y: f32,
-    angle_z: f32,
-}
-
 fn matrix_from_frame(frame: &Joint) -> Mat4 {
     Mat4 {
         x_axis: Vec4::new(
@@ -612,15 +634,11 @@ fn matrix_from_frame(frame: &Joint) -> Mat4 {
     }
 }
 
-#[derive(Component)]
-struct Bone;
-
 fn spawn_cubes(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    /*
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
@@ -639,9 +657,16 @@ fn spawn_cubes(
         })
         .insert(PickableBundle::default())
         .insert(Clickable);
+}
 
-    */
+fn spawn_skeleton(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     let skeleton_parts = skelly();
+    let mut bone_id = 1;
+
     let name = "Hips".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
     let mesh = make_bone_mesh(bone);
@@ -654,13 +679,12 @@ fn spawn_cubes(
         .insert(PickableBundle::default())
         .insert(Clickable)
         .insert(Name::from(name))
-        .insert(Bone)
+        .insert(Bone { id: bone_id })
         .id();
     commands.entity(hips).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
-
-
+    bone_id += 1;
 
     let prev = bone;
     let name = "Left Femur".to_string();
@@ -679,12 +703,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_femur).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let prev = bone;
     let name = "Left Calf".to_string();
@@ -703,12 +728,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_calf).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let prev = bone;
     let name = "Left Foot".to_string();
@@ -727,12 +753,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_foot).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let name = "Hips".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
@@ -753,12 +780,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_femur).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let prev = bone;
     let name = "Right Calf".to_string();
@@ -777,12 +805,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_calf).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let prev = bone;
     let name = "Right Foot".to_string();
@@ -801,12 +830,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_foot).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let name = "Hips".to_string();
     let prev = skeleton_parts.get(&name).unwrap();
@@ -835,13 +865,14 @@ fn spawn_cubes(
                 })
                 .insert(PickableBundle::default())
                 .insert(Clickable)
-                .insert(Bone)
+                .insert(Bone { id: bone_id })
                 .insert(Name::from(format!("{} {}", name, i)))
                 .id()
         });
         commands.entity(lumbar).add_children(|parent| {
             spawn_bone_axis(parent, &mut meshes, &mut materials);
         });
+        bone_id += 1;
         prev_entity = lumbar;
     }
 
@@ -863,12 +894,13 @@ fn spawn_cubes(
                 .insert(PickableBundle::default())
                 .insert(Clickable)
                 .insert(Name::from(format!("{} {}", name, i)))
-                .insert(Bone)
+                .insert(Bone { id: bone_id })
                 .id()
         });
         commands.entity(thoracic).add_children(|parent| {
             spawn_bone_axis(parent, &mut meshes, &mut materials);
         });
+    bone_id += 1;
         prev_entity = thoracic;
     }
 
@@ -890,12 +922,13 @@ fn spawn_cubes(
                 .insert(PickableBundle::default())
                 .insert(Clickable)
                 .insert(Name::from(format!("{} {}", name, i)))
-                .insert(Bone)
+                .insert(Bone { id: bone_id })
                 .id()
         });
         commands.entity(cervical).add_children(|parent| {
             spawn_bone_axis(parent, &mut meshes, &mut materials);
         });
+    bone_id += 1;
         prev_entity = cervical;
     }
     let c7 = prev_entity;
@@ -917,12 +950,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(head).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     let prev = bone;
     let name = "Left Clavical".to_string();
@@ -941,12 +975,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_clavical).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
     prev_entity = left_clavical;
 
     let prev = bone;
@@ -966,12 +1001,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_arm).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
     prev_entity = left_arm;
 
     let prev = bone;
@@ -991,12 +1027,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_forearm).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
     prev_entity = left_forearm;
 
     let prev = bone;
@@ -1016,12 +1053,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(left_hand).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
 
     prev_entity = c7;
 
@@ -1041,12 +1079,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_clavical).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
     prev_entity = right_clavical;
 
     let prev = bone;
@@ -1066,12 +1105,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_arm).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
     prev_entity = right_arm;
 
     let prev = bone;
@@ -1091,12 +1131,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_forearm).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
+    bone_id += 1;
     prev_entity = right_forearm;
 
     let prev = bone;
@@ -1116,13 +1157,13 @@ fn spawn_cubes(
             .insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
-            .insert(Bone)
+            .insert(Bone { id: bone_id })
             .id()
     });
     commands.entity(right_hand).add_children(|parent| {
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
-
+    bone_id += 1;
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
@@ -1141,8 +1182,74 @@ fn spawn_cubes(
     */
 }
 
-#[derive(Component)]
-struct VisibleAxis;
+fn setup_ui(
+    mut commands: Commands,
+) {
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|commands| {
+            commands.spawn(TextBundle {
+                style: Style {
+                    align_self: AlignSelf::Center,
+                    margin: UiRect::all(Val::Percent(3.0)),
+                    ..default()
+                },
+                text: Text::from_section(
+                    "Asanas yogaMat !!!",
+                    TextStyle {
+                        //font: my_assets.font.clone(),
+                        font_size: 70.0,
+                        //color: my_assets.color,
+                        ..Default::default()
+                    },
+                ),
+                ..default()
+            })
+            .insert(Name::new("GameTitle"));
+
+    let button_margin = UiRect::all(Val::Percent(2.0));
+        commands
+            .spawn(ButtonBundle {
+                style: Style {
+                    size: Size::new(Val::Px(91.0), Val::Px(91.0)),
+                    align_self: AlignSelf::Center,
+                    justify_content: JustifyContent::Center,
+                    margin: button_margin,
+                    ..default()
+                },
+                //image: img.into(),
+                ..default()
+            }).insert(LoadButton)
+            .with_children(|commands| {
+                commands.spawn(TextBundle {
+                    style: Style {
+                        align_self: AlignSelf::FlexStart,
+                        margin: UiRect::all(Val::Percent(3.0)),
+                        position: UiRect::new(Val::Px(0.0), Val::Px(-110.0), Val::Px(20.0), Val::Px(0.0)),
+                        ..default()
+                    },
+                    text: Text::from_section(
+                        "load me",
+                        TextStyle {
+                            //font: my_assets.font.clone(),
+                            font_size: 44.0,
+                            //color: my_assets.color,
+                            ..Default::default()
+                        },
+                    ),
+                    ..default()
+                });
+            });
+        });
+}
 
 fn spawn_bone_axis(
     commands: &mut ChildBuilder,
