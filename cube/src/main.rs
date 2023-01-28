@@ -64,6 +64,7 @@ struct BoneCube {
     y: f32,
     inset: f32,
     transform: Transform,
+    name: String,
 }
 
 #[derive(Default)]
@@ -84,42 +85,15 @@ struct Joint {
     angle_z: f32,
 }
 
-/*
-CREATE TABLE asana (asanaID INTEGER PRIMARY KEY, sanskritName TEXT, englishName TEXT, userNotes TEXT);
-CREATE TABLE pose ( poseID INTEGER PRIMARY KEY, asanaID INTEGER);
-152|Tadasana|Mountain|
-
-CREATE TABLE joint (
-jointID INTEGER,
-poseID INTEGER,
-upX REAL,
-upY REAL,
-upZ REAL,
-forwardX REAL,
-forwardY REAL,
-forwardZ REAL,
-originX REAL,
-originY REAL,
-originZ REAL,
-xAngle REAL,
-yAngle REAL,
-zAngle REAL,
-PRIMARY KEY (jointID, poseID)
-);
-*/
-
-
-
-
 fn main() {
     App::new()
-        //.insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
         .insert_resource(ClearColor(Color::hex("292929").unwrap()))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             window: WindowDescriptor {
                 title: "YogaMat".to_string(),
-                width: 800.0,
-                height: 800.0,
+                width: 1290.0,
+                height: 1400.0,
+                position: WindowPosition::At(Vec2::new(0.0, 0.0)),
                 ..default()
             },
             ..default()
@@ -133,13 +107,13 @@ fn main() {
         //.add_plugin(DebugEventsPickingPlugin) // <- Adds debug event logging (optional)
         .add_startup_system(spawn_skeleton)
         .add_startup_system(spawn_camera)
-        .add_startup_system(spawn_axis)
+        .add_startup_system(spawn_main_axis)
         .add_startup_system(setup_ui)
         .add_startup_system(spawn_mat)
         //.add_system(button_clicked)
         .add_system(keyboard_input_system)
         .add_startup_system_to_stage(StartupStage::PreStartup, load_resources)
-        //.add_startup_system_to_stage(StartupStage::PostStartup, initial_pose)
+        .add_startup_system_to_stage(StartupStage::PostStartup, initial_pose)
         //.add_system(cube_click)
         .run();
 }
@@ -352,8 +326,9 @@ fn skelly() -> HashMap<String, BoneCube> {
     let the_inset = 0.75;
     let mut map = HashMap::new();
 
+    let mut name = "Hips".to_string();
     map.insert(
-        "Hips".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 15.0,
             x_bottom: 13.0,
@@ -362,11 +337,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: hip_length,
             inset: 1.0,
             transform: Transform::from_xyz(0.0, -hip_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Femur".to_string();
     map.insert(
-        "Left Femur".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 6.0,
             x_bottom: 4.0,
@@ -375,11 +352,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: femur_length,
             inset: 1.25,
             transform: Transform::from_xyz(0.0, -femur_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Femur".to_string();
     map.insert(
-        "Right Femur".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 6.0,
             x_bottom: 4.0,
@@ -388,11 +367,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: femur_length,
             inset: 1.25,
             transform: Transform::from_xyz(0.0, -femur_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Calf".to_string();
     map.insert(
-        "Left Calf".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 4.5,
             x_bottom: 2.5,
@@ -401,11 +382,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: calf_length,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -calf_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Calf".to_string();
     map.insert(
-        "Right Calf".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 4.5,
             x_bottom: 2.5,
@@ -414,11 +397,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: calf_length,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -calf_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Foot".to_string();
     map.insert(
-        "Left Foot".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.5,
             x_bottom: 6.0,
@@ -427,11 +412,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: foot_length,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -foot_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Foot".to_string();
     map.insert(
-        "Right Foot".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.5,
             x_bottom: 6.0,
@@ -440,11 +427,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: foot_length,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -foot_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Lumbar".to_string();
     map.insert(
-        "Lumbar".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.0,
             x_bottom: 3.0,
@@ -453,11 +442,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: (l_spine_length / 5.0),
             inset: 0.5,
             transform: Transform::from_xyz(0.0, -(l_spine_length / 5.0) / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Thoracic".to_string();
     map.insert(
-        "Thoracic".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.0,
             x_bottom: 3.0,
@@ -466,11 +457,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: t_spine_length / 12.0,
             inset: 0.5,
             transform: Transform::from_xyz(0.0, -(t_spine_length / 12.0) / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Cervical".to_string();
     map.insert(
-        "Cervical".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.0,
             x_bottom: 3.0,
@@ -479,11 +472,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: (c_spine_length / 7.0),
             inset: 0.5,
             transform: Transform::from_xyz(0.0, -(c_spine_length / 7.0) / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Head".to_string();
     map.insert(
-        "Head".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 12.0,
             x_bottom: 12.0,
@@ -492,11 +487,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: head_length,
             inset: 2.5,
             transform: Transform::from_xyz(0.0, -head_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Clavical".to_string();
     map.insert(
-        "Left Clavical".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 2.0,
             x_bottom: 2.0,
@@ -505,11 +502,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: clavical_lengh,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -clavical_lengh / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Clavical".to_string();
     map.insert(
-        "Right Clavical".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 2.0,
             x_bottom: 2.0,
@@ -518,11 +517,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: clavical_lengh,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -clavical_lengh / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Arm".to_string();
     map.insert(
-        "Left Arm".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 4.20,
             x_bottom: 3.25,
@@ -531,11 +532,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: humerus_length,
             inset: 1.0,
             transform: Transform::from_xyz(0.0, -humerus_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Arm".to_string();
     map.insert(
-        "Right Arm".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 4.20,
             x_bottom: 3.25,
@@ -544,11 +547,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: humerus_length,
             inset: 1.0,
             transform: Transform::from_xyz(0.0, -humerus_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Forearm".to_string();
     map.insert(
-        "Left Forearm".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.75,
             x_bottom: 2.75,
@@ -557,11 +562,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: forearm_length,
             inset: 1.0,
             transform: Transform::from_xyz(0.0, -forearm_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Forearm".to_string();
     map.insert(
-        "Right Forearm".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.75,
             x_bottom: 2.75,
@@ -570,11 +577,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: forearm_length,
             inset: 1.0,
             transform: Transform::from_xyz(0.0, -forearm_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Left Hand".to_string();
     map.insert(
-        "Left Hand".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.0,
             x_bottom: 2.0,
@@ -583,11 +592,13 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: hand_length,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -hand_length / 2.0, 0.0),
+            name,
         },
     );
 
+    name = "Right Hand".to_string();
     map.insert(
-        "Right Hand".to_string(),
+        name.clone(),
         BoneCube {
             x_top: 3.0,
             x_bottom: 2.0,
@@ -596,6 +607,7 @@ fn skelly() -> HashMap<String, BoneCube> {
             y: hand_length,
             inset: the_inset,
             transform: Transform::from_xyz(0.0, -hand_length / 2.0, 0.0),
+            name,
         },
     );
 
@@ -845,15 +857,13 @@ fn spawn_mat(
             material: materials.add(Color::rgb(0.1, 0.1, 0.5).into()),
             transform: Transform::from_xyz(0.0, -109.5, 0.0),
             ..default()
-        })
-        .insert(PickableBundle::default())
-        .insert(Clickable);
+        });
 
+    /*
     commands.insert_resource(AmbientLight {
         color: Color::rgb_u8(242, 226, 201),
         brightness: 0.2,
     });
-
     let light = commands.spawn(PointLightBundle {
         point_light: PointLight {
             intensity: 500.0,
@@ -863,9 +873,57 @@ fn spawn_mat(
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
     }).id();
-    commands.entity(light).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+    */
+
+    let lights = vec![Vec3::new(-50.0, 50.0, 25.0), Vec3::new(50.0, 50.0, 25.0),
+    Vec3::new(-50.0, 50.0, -25.0), Vec3::new(50.0, 50.0, -25.0)];
+    for (light_number, light_translation) in lights.into_iter().enumerate() {
+        let rotation = Quat::from_rotation_x((-90.0_f32).to_radians());
+        let light = commands.spawn(SpotLightBundle {
+            spot_light: SpotLight {
+                intensity: 400000.0,
+                range: 250.0,
+                radius: 45.0,
+                shadows_enabled: true,
+                ..Default::default()
+            },
+            transform: Transform::from_translation(light_translation).with_rotation(rotation),
+            ..Default::default()
+        }).insert(Name::from(format!("my spot {}", light_number))).id();
+        commands.entity(light).add_children(|parent| {
+            spawn_entity_axis(parent, &mut meshes, &mut materials, true);
+        });
+    }
+}
+
+fn spawn_bone(
+    mut commands: &mut Commands,
+    mut meshes: &mut ResMut<Assets<Mesh>>,
+    material: Handle<StandardMaterial>,
+    mut materials: &mut ResMut<Assets<StandardMaterial>>,
+    bone_cube: &BoneCube,
+    bone_id: i32,
+    bone_parent: Entity,
+    transform: Transform,
+) -> Entity {
+    let new_bone = commands.entity(bone_parent).add_children(|parent| {
+        parent
+            .spawn(PbrBundle {
+                mesh: meshes.add(make_bone_mesh(bone_cube)),
+                material,
+                transform,
+                ..default()
+            })
+            //.insert(PickableBundle::default())
+            .insert(Clickable)
+            .insert(Name::from(bone_cube.name.clone()))
+            .insert(Bone { id: bone_id })
+            .id()
     });
+    commands.entity(new_bone).add_children(|parent| {
+        spawn_entity_axis(parent, &mut meshes, &mut materials, false);
+    });
+    new_bone
 }
 
 fn spawn_skeleton(
@@ -873,16 +931,27 @@ fn spawn_skeleton(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let material = StandardMaterial {
+        base_color: Color::rgba_u8(133, 80, 0, 255).into(),
+        //base_color: Color::rgba_u8(133, 0, 0, 255).into(),
+        reflectance: 0.2,
+        perceptual_roughness: 0.75,
+        ..Default::default()
+    };
+    let material_handle = materials.add(material);
+
     let skeleton_parts = skelly();
     let mut bone_id = 1;
+    let axis_visible = false;
 
     let name = "Hips".to_string();
-    let bone = skeleton_parts.get(&name).unwrap();
+    let mut bone = skeleton_parts.get(&name).unwrap();
+    let hip_bone = bone;
     let mesh = make_bone_mesh(bone);
     let hips = commands
         .spawn(PbrBundle {
             mesh: meshes.add(mesh),
-            material: materials.add(Color::rgb(0.5, 0.0, 0.0).into()),
+            material: material_handle.clone(),
             ..default()
         })
         //.insert(PickableBundle::default())
@@ -891,10 +960,52 @@ fn spawn_skeleton(
         .insert(Bone { id: bone_id })
         .id();
     commands.entity(hips).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(7.5, -bone.y, 1.55);
+    let name = "Left Femur".to_string();
+    bone = skeleton_parts.get(&name).unwrap();
+    let mut prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, hips, transform);
+    bone_id += 1;
+
+    let name = "Left Calf".to_string();
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -bone.y, 0.0);
+    let bone = skeleton_parts.get(&name).unwrap();
+    prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
+    bone_id += 1;
+
+    let name = "Left Foot".to_string();
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -bone.y, 0.0);
+    let bone = skeleton_parts.get(&name).unwrap();
+    prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
+    bone_id += 1;
+
+    let name = "Right Femur".to_string();
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(-7.5, -hip_bone.y, 1.55);
+    let bone = skeleton_parts.get(&name).unwrap();
+    prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, hips, transform);
+    bone_id += 1;
+
+    let name = "Right Calf".to_string();
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -bone.y, 0.0);
+    let bone = skeleton_parts.get(&name).unwrap();
+    prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
+    bone_id += 1;
+
+    let name = "Right Foot".to_string();
+    let mut transform = Transform::IDENTITY;
+    transform.translation += Vec3::new(0.0, -bone.y, 0.0);
+    let bone = skeleton_parts.get(&name).unwrap();
+    prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
+    bone_id += 1;
+/*
     let prev = bone;
     let name = "Left Femur".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
@@ -905,7 +1016,7 @@ fn spawn_skeleton(
         parent
             .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
-                material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
+                material: material_handle.clone(),
                 transform,
                 ..default()
             })
@@ -916,7 +1027,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_femur).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -926,7 +1037,7 @@ fn spawn_skeleton(
     let mut transform = Transform::IDENTITY;
     transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let left_calf = commands.entity(left_femur).add_children(|parent| {
+    let left_calf = commands.entity(prev_entity).add_children(|parent| {
         parent
             .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
@@ -941,7 +1052,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_calf).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -951,7 +1062,7 @@ fn spawn_skeleton(
     let mut transform = Transform::IDENTITY;
     transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let left_foot = commands.entity(left_calf).add_children(|parent| {
+    let left_foot = commands.entity(prev_entity).add_children(|parent| {
         parent
             .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
@@ -966,7 +1077,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_foot).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -993,7 +1104,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_femur).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -1003,7 +1114,7 @@ fn spawn_skeleton(
     let mut transform = Transform::IDENTITY;
     transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let right_calf = commands.entity(right_femur).add_children(|parent| {
+    let right_calf = commands.entity(prev_entity).add_children(|parent| {
         parent
             .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
@@ -1018,7 +1129,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_calf).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -1028,7 +1139,7 @@ fn spawn_skeleton(
     let mut transform = Transform::IDENTITY;
     transform.translation += Vec3::new(0.0, -prev.y, 0.0);
     let mesh = make_bone_mesh(bone);
-    let right_foot = commands.entity(right_calf).add_children(|parent| {
+    let right_foot = commands.entity(prev_entity).add_children(|parent| {
         parent
             .spawn(PbrBundle {
                 mesh: meshes.add(mesh),
@@ -1043,10 +1154,11 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_foot).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
+    */
     let name = "Hips".to_string();
     let prev = skeleton_parts.get(&name).unwrap();
     let name = "Lumbar".to_string();
@@ -1079,7 +1191,7 @@ fn spawn_skeleton(
                 .id()
         });
         commands.entity(lumbar).add_children(|parent| {
-            spawn_bone_axis(parent, &mut meshes, &mut materials);
+            spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
         });
         bone_id += 1;
         prev_entity = lumbar;
@@ -1107,7 +1219,7 @@ fn spawn_skeleton(
                 .id()
         });
         commands.entity(thoracic).add_children(|parent| {
-            spawn_bone_axis(parent, &mut meshes, &mut materials);
+            spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
         });
     bone_id += 1;
         prev_entity = thoracic;
@@ -1135,7 +1247,7 @@ fn spawn_skeleton(
                 .id()
         });
         commands.entity(cervical).add_children(|parent| {
-            spawn_bone_axis(parent, &mut meshes, &mut materials);
+            spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
         });
     bone_id += 1;
         prev_entity = cervical;
@@ -1163,7 +1275,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(head).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -1188,7 +1300,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_clavical).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
     prev_entity = left_clavical;
@@ -1214,7 +1326,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_arm).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
     prev_entity = left_arm;
@@ -1240,7 +1352,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_forearm).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
     prev_entity = left_forearm;
@@ -1266,7 +1378,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(left_hand).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 
@@ -1292,7 +1404,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_clavical).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
     prev_entity = right_clavical;
@@ -1318,7 +1430,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_arm).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
     prev_entity = right_arm;
@@ -1344,7 +1456,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_forearm).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
     prev_entity = right_forearm;
@@ -1370,7 +1482,7 @@ fn spawn_skeleton(
             .id()
     });
     commands.entity(right_hand).add_children(|parent| {
-        spawn_bone_axis(parent, &mut meshes, &mut materials);
+        spawn_entity_axis(parent, &mut meshes, &mut materials, axis_visible);
     });
     bone_id += 1;
 }
@@ -1450,12 +1562,12 @@ fn setup_ui(
         });
 }
 
-fn spawn_bone_axis(
+fn spawn_entity_axis(
     commands: &mut ChildBuilder,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    initial_visibility: bool,
 ) {
-    let initial_visibility = false;
     let length = 7.0;
     let width = 0.1;
     //let x = Box::new(x_length, y_length, z_length);
@@ -1517,7 +1629,7 @@ fn spawn_bone_axis(
     });
 }
 
-fn spawn_axis(
+fn spawn_main_axis(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
