@@ -124,7 +124,8 @@ fn main() {
             },
             ..default()
         }))
-        //.add_plugin(WorldInspectorPlugin)
+        .add_plugin(WorldInspectorPlugin)
+        .register_type::<PanOrbitCamera>()
         //.add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
@@ -134,13 +135,44 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_axis)
         .add_startup_system(setup_ui)
+        .add_startup_system(spawn_mat)
         //.add_system(button_clicked)
         .add_system(keyboard_input_system)
         .add_startup_system_to_stage(StartupStage::PreStartup, load_resources)
+        //.add_startup_system_to_stage(StartupStage::PostStartup, initial_pose)
         //.add_system(cube_click)
         .run();
 }
 
+fn initial_pose(
+    mut yoga_assets: ResMut<YogaAssets>,
+    mut bones: Query<(&mut Transform, &Bone)>,
+    mut asana_text: Query<&mut Text, With<AsanaName>>,
+) {
+        yoga_assets.current_idx += 1;
+        if yoga_assets.current_idx > yoga_assets.asanas.len() - 1 {
+            yoga_assets.current_idx = 0;
+        }
+        let name = yoga_assets.asanas[yoga_assets.current_idx].sanskrit.clone();
+
+        let name_text = TextSection::new(
+            name.clone(),
+            TextStyle {
+                font: yoga_assets.font.clone(),
+                font_size: 24.0,
+                color: yoga_assets.font_color,
+            }
+        );
+
+        let mut change_me = asana_text.single_mut();
+        *change_me = Text::from_sections([name_text]);
+
+        let joints = load_pose(name);
+        for (mut transform, bone) in bones.iter_mut() {
+            let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
+            *transform = Transform::from_matrix(mat.mat);
+        }
+}
 
 fn load_resources(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(YogaAssets {
@@ -584,21 +616,25 @@ fn make_bone_mesh(cube: &BoneCube) -> Mesh {
 	let half_xbottom = x_bottom / 2.0;
 	let half_zbottom = z_bottom / 2.0;
 
+    // 0,3,2, 0,2,1,			// top
 	corners.push([-x_top/2.0+inset, y/2.0, half_ztop-inset]);
 	corners.push([-half_xtop+inset, y/2.0, -half_ztop+inset]);
 	corners.push([half_xtop-inset, y/2.0, -half_ztop+inset]);
 	corners.push([half_xtop-inset, y/2.0 , half_ztop-inset]);
 	
+	// 4,5,7, 5,6,7,			// bottom
 	corners.push([-half_xbottom+inset, -y/2.0, -half_zbottom+inset]);
 	corners.push([half_xbottom-inset, -y/2.0, -half_zbottom+inset]);
 	corners.push([half_xbottom-inset, -y/2.0, half_zbottom-inset]);
 	corners.push([-half_xbottom+inset, -y/2.0, half_zbottom-inset]);
 	
+	// 8,9,10, 9,11,10,         // back
 	corners.push([-half_xtop+inset, y/2.0-inset, -half_ztop]);
 	corners.push([half_xtop-inset, y/2.0-inset, -half_ztop]);
 	corners.push([-half_xbottom+inset, -y/2.0+inset, -half_zbottom]);
 	corners.push([half_xbottom-inset, -y/2.0+inset, -half_zbottom]);
 
+	// 12,13,14, 14,15,12,		// front
 	corners.push([half_xtop-inset, y/2.0-inset, half_ztop]);
 	corners.push([-half_xtop+inset, y/2.0-inset, half_ztop]);
 	corners.push([-half_xbottom+inset, -y/2.0+inset, half_zbottom]);
@@ -620,7 +656,7 @@ fn make_bone_mesh(cube: &BoneCube) -> Mesh {
         corner[2] += cube.transform.translation.z;
     }
 
-	let indices/*[108+24]*/ = [
+	let indices: [usize; 132] /*[108+24]*/ = [
 		// 12 faces
 		0,3,2, 0,2,1,			// top
 		4,5,7, 5,6,7,			// bottom
@@ -645,22 +681,77 @@ fn make_bone_mesh(cube: &BoneCube) -> Mesh {
 		1,2,9, 9,8,1,			// top back
 		10,11,4, 4,11,5,		// bottom back
 		2,3,20, 20,23,2,		// top right
-		22,21,6, 6,5,22,			// bottom right
+		22,21,6, 6,5,22,		// bottom right
 		
 		13,16,17, 17,14,13,		// front left
 		19,8,10, 10,18,19,		// back left	
 		9,23,22, 22,11,9,		// back right
 		20,12,21, 21, 12,15		// front right
     ];
-    let indices: Vec<u16> = Vec::from(indices);
-    let indices = Indices::U16(indices);
+
+    let mut triangles: Vec<[f32; 3]> = Vec::new();
+    for i in indices.chunks(3) {
+        triangles.push(corners[i[0]]);
+        triangles.push(corners[i[1]]);
+        triangles.push(corners[i[2]]);
+    }
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, corners);
-    mesh.set_indices(Some(indices));
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, triangles);
+    mesh.compute_flat_normals();
     mesh
 }
-/*
+
+fn vector_magnitude(vector: &[f32; 3]) -> f32 {
+	((vector[0] * vector[0]) + (vector[1] * vector[1]) + (vector[2] * vector[2])).sqrt()
+}
+
+fn vector_normalize(vector: &mut [f32; 3]) {
+	let vec_mag: f32 = vector_magnitude(&vector);
+    // float comparision WARNING
+	if vec_mag == 0.0 {
+		vector[0] = 1.0;
+		vector[1] = 0.0;
+		vector[2] = 0.0;
+	} else {
+        vector[0] /= vec_mag;
+        vector[1] /= vec_mag;
+        vector[2] /= vec_mag;
+    }
+}
+
+fn  vector_make_with_start_and_end_points(start: [f32; 3], end: [f32; 3]) -> [f32; 3] {
+    let mut ret = 
+	[end[0] - start[0],
+	end[1] - start[1],
+	end[2] - start[2]];
+	vector_normalize(&mut ret);
+	ret
+}
+
+fn triangle_calculate_surface_normal(triangles: [[f32; 3]; 3]) -> [f32; 3] {
+	let u = vector_make_with_start_and_end_points(triangles[1], triangles[0]);
+	let v = vector_make_with_start_and_end_points(triangles[2], triangles[0]);
+	[(u[1] * v[2]) - (u[2] * v[1]),
+	(u[2] * v[0]) - (u[0] * v[2]),
+	(u[0] * v[1]) - (u[1] * v[0])]
+}
+
+fn calculate_vertex_normals(triangles: &Vec<[[f32; 3]; 3]>) -> Vec<Vec3> {
+    let triangle_count = triangles.len();
+	let mut surface_normals: Vec<[f32; 3]> = Vec::with_capacity(triangle_count);
+
+	for i in 0..triangle_count {
+        let mut surface_normal = triangle_calculate_surface_normal(triangles[i]);
+        vector_normalize(&mut surface_normal);
+        surface_normals.push(surface_normal);
+	}
+	
+    let mut vertex_normals: Vec<[f32; 3]> = Vec::with_capacity(triangle_count * 3);
+    vertex_normals.resize(triangle_count * 3, [0.0, 0.0, 0.0]);
+    todo!()
+}
+
 fn cube_click(
     selection: Query<(&Transform, &Selection)>,
     mut camera: Query<(&mut PanOrbitCamera, &Transform)>,
@@ -685,18 +776,22 @@ fn cube_click(
     camera.radius = (camera_transform.translation - center).length();
     camera.focus = center;
 }
-*/
 
 fn spawn_camera(mut commands: Commands) {
-    let focus: Vec3 = Vec3::ZERO;
 
     let mut transform = Transform::default();
-    transform.translation = Vec3 {
-        x: -2.0,
-        y: 2.5,
-        z: 5.0,
+    transform.translation.x = -92.828;
+    transform.translation.y = -18.648;
+    transform.translation.z = 198.376;
+    transform.rotation.x = -0.136;
+    transform.rotation.y = -0.425;
+    transform.rotation.x = -0.028;
+
+    let focus = Vec3 {
+        x: -0.045,
+        y: -46.059,
+        z: 3.105,
     };
-    transform.look_at(focus, Vec3::Y);
 
     let camera = Camera3dBundle {
         transform,
@@ -739,29 +834,38 @@ fn matrix_from_frame(frame: &Joint) -> Mat4 {
     }
 }
 
-fn spawn_cubes(
+fn spawn_mat(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-            transform: Transform::from_xyz(-1.0, 0.0, 0.0),
+            mesh: meshes.add(Mesh::from(shape::Box::new(114.7, 1.0, 43.4))),
+            material: materials.add(Color::rgb(0.1, 0.1, 0.5).into()),
+            transform: Transform::from_xyz(0.0, -109.5, 0.0),
             ..default()
         })
         .insert(PickableBundle::default())
         .insert(Clickable);
-    commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
-            transform: Transform::from_xyz(1.0, 0.0, 0.0),
+
+    commands.insert_resource(AmbientLight {
+        color: Color::rgb_u8(242, 226, 201),
+        brightness: 0.2,
+    });
+
+    let light = commands.spawn(PointLightBundle {
+        point_light: PointLight {
+            intensity: 500.0,
+            shadows_enabled: true,
             ..default()
-        })
-        .insert(PickableBundle::default())
-        .insert(Clickable);
+        },
+        transform: Transform::from_xyz(0.0, 0.0, 0.0),
+        ..default()
+    }).id();
+    commands.entity(light).add_children(|parent| {
+        spawn_bone_axis(parent, &mut meshes, &mut materials);
+    });
 }
 
 fn spawn_skeleton(
@@ -778,10 +882,10 @@ fn spawn_skeleton(
     let hips = commands
         .spawn(PbrBundle {
             mesh: meshes.add(mesh),
-            material: materials.add(Color::rgb(0.5, 0.1, 0.1).into()),
+            material: materials.add(Color::rgb(0.5, 0.0, 0.0).into()),
             ..default()
         })
-        .insert(PickableBundle::default())
+        //.insert(PickableBundle::default())
         .insert(Clickable)
         .insert(Name::from(name))
         .insert(Bone { id: bone_id })
@@ -805,7 +909,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -830,7 +934,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -855,7 +959,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -882,7 +986,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -907,7 +1011,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -932,7 +1036,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -968,7 +1072,7 @@ fn spawn_skeleton(
                     transform,
                     ..default()
                 })
-                .insert(PickableBundle::default())
+                //.insert(PickableBundle::default())
                 .insert(Clickable)
                 .insert(Bone { id: bone_id })
                 .insert(Name::from(format!("{} {}", name, i)))
@@ -996,7 +1100,7 @@ fn spawn_skeleton(
                     transform,
                     ..default()
                 })
-                .insert(PickableBundle::default())
+                //.insert(PickableBundle::default())
                 .insert(Clickable)
                 .insert(Name::from(format!("{} {}", name, i)))
                 .insert(Bone { id: bone_id })
@@ -1024,7 +1128,7 @@ fn spawn_skeleton(
                     transform,
                     ..default()
                 })
-                .insert(PickableBundle::default())
+                //.insert(PickableBundle::default())
                 .insert(Clickable)
                 .insert(Name::from(format!("{} {}", name, i)))
                 .insert(Bone { id: bone_id })
@@ -1052,7 +1156,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1077,7 +1181,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1103,7 +1207,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1129,7 +1233,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1155,7 +1259,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1181,7 +1285,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1207,7 +1311,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1233,7 +1337,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1259,7 +1363,7 @@ fn spawn_skeleton(
                 transform,
                 ..default()
             })
-            .insert(PickableBundle::default())
+            //.insert(PickableBundle::default())
             .insert(Clickable)
             .insert(Name::from(name))
             .insert(Bone { id: bone_id })
@@ -1269,22 +1373,6 @@ fn spawn_skeleton(
         spawn_bone_axis(parent, &mut meshes, &mut materials);
     });
     bone_id += 1;
-
-    commands.insert_resource(AmbientLight {
-        color: Color::WHITE,
-        brightness: 0.1,
-    });
-    /*
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1500.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
-    */
 }
 
 fn setup_ui(
@@ -1367,6 +1455,7 @@ fn spawn_bone_axis(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
+    let initial_visibility = false;
     let length = 7.0;
     let width = 0.1;
     //let x = Box::new(x_length, y_length, z_length);
@@ -1377,7 +1466,7 @@ fn spawn_bone_axis(
     let mut empty = commands.spawn_empty();
     empty
         .insert(TransformBundle::from_transform(Transform::IDENTITY))
-        .insert(Visibility::default())
+        .insert(Visibility { is_visible: initial_visibility })
         .insert(ComputedVisibility::default())
         .insert(Name::from("bone axis"));
 
@@ -1391,7 +1480,6 @@ fn spawn_bone_axis(
                     mesh: meshes.add(Mesh::from(x)),
                     material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
                     transform,
-                    visibility: Visibility { is_visible: false },
                     ..default()
                 },
                 NotShadowCaster,
@@ -1406,7 +1494,6 @@ fn spawn_bone_axis(
                     mesh: meshes.add(Mesh::from(y)),
                     material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
                     transform,
-                    visibility: Visibility { is_visible: false },
                     ..default()
                 },
                 NotShadowCaster,
@@ -1421,7 +1508,6 @@ fn spawn_bone_axis(
                     mesh: meshes.add(Mesh::from(z)),
                     material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
                     transform,
-                    visibility: Visibility { is_visible: false },
                     ..default()
                 },
                 NotShadowCaster,

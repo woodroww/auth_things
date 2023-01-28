@@ -10,7 +10,7 @@ impl Plugin for CameraPlugin {
 }
 
 /// Tags an entity as capable of panning and orbiting.
-#[derive(Component)]
+#[derive(Component, Reflect)]
 pub struct PanOrbitCamera {
     /// The "focus point" to orbit around. It is automatically updated when panning the camera
     pub focus: Vec3,
@@ -37,7 +37,7 @@ fn pan_orbit_camera(
     mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
 ) {
     // change input mapping for orbit and panning here
-    let orbit_button = MouseButton::Left;
+    let orbit_button = MouseButton::Middle;
     let pan_button = MouseButton::Right;
 
     let mut pan = Vec2::ZERO;
