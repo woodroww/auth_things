@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use bevy::{prelude::*, render::render_resource::PrimitiveTopology};
+use serde::{Serialize, Deserialize};
 
 pub struct JointMatrix {
     pub mat: Mat4,
     pub joint_id: i32,
 }
 
+#[derive(Clone)]
 pub struct BoneCube {
     x_top: f32,
     x_bottom: f32,
@@ -17,7 +19,7 @@ pub struct BoneCube {
     pub name: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Joint {
     pub joint_id: i32,
     pub pose_id: i32,
@@ -335,7 +337,7 @@ pub fn skelly() -> HashMap<String, BoneCube> {
             z_bottom: 12.0,
             y: head_length,
             inset: 2.5,
-            transform: Transform::from_xyz(0.0, -head_length / 2.0, 0.0),
+            transform: Transform::from_xyz(0.0, -head_length, 0.0),
             name,
         },
     );

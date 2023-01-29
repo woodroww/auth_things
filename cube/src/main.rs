@@ -1,16 +1,19 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File};
 
 use bevy::{
     pbr::NotShadowCaster,
     prelude::*,
-    render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
 use bevy_mod_picking::*;
 use camera::{CameraPlugin, PanOrbitCamera};
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_inspector_egui::quick::FilterQueryInspectorPlugin;
+
+#[cfg(not(target_arch="wasm32"))]
 use rusqlite::Connection;
+
 use skeleton::{make_bone_mesh, JointMatrix, Joint, BoneCube};
+
+use serde::{Serialize, Deserialize};
+use std::io::Write;
 
 mod camera;
 mod skeleton;
@@ -33,6 +36,7 @@ pub struct YogaAssets {
     font_color: Color,
     asanas: Vec<AsanaDB>,
     current_idx: usize,
+    poses: HashMap<i32, Vec<Joint>>,
 }
 
 #[derive(Component)]
@@ -46,13 +50,22 @@ struct Bone {
 #[derive(Component)]
 struct BoneAxis;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct AsanaDB {
     asana_id: i32,
+    pose_id: i32,
     sanskrit: String,
     english: String,
     notes: Option<String>,
 }
+
+#[derive(Serialize, Deserialize)]
+struct AsanaData {
+    asanas: Vec<AsanaDB>,
+    poses: HashMap<i32, Vec<Joint>>,
+}
+
+//static DB: &[u8] = include_bytes!("../yogamatdb.sql");
 
 fn main() {
     App::new()
@@ -67,11 +80,12 @@ fn main() {
             },
             ..default()
         }))
-        .add_plugin(WorldInspectorPlugin)
-        .add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
+        //.add_plugin(WorldInspectorPlugin)
+        //.add_plugin(FilterQueryInspectorPlugin::<With<Bone>>::default())
         .register_type::<PanOrbitCamera>()
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
+        //.add_plugin(bevy_transform_gizmo::TransformGizmoPlugin::new(Quat::default()))
         .add_startup_system(spawn_skeleton)
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_main_axis)
@@ -79,7 +93,7 @@ fn main() {
         .add_startup_system(spawn_mat)
         .add_system(keyboard_input_system)
         .add_startup_system_to_stage(StartupStage::PreStartup, load_resources)
-        //.add_startup_system_to_stage(StartupStage::PostStartup, initial_pose)
+        .add_startup_system_to_stage(StartupStage::PostStartup, initial_pose)
         .run();
 }
 
@@ -88,10 +102,7 @@ fn initial_pose(
     mut bones: Query<(&mut Transform, &Bone)>,
     mut asana_text: Query<&mut Text, With<AsanaName>>,
 ) {
-        yoga_assets.current_idx += 1;
-        if yoga_assets.current_idx > yoga_assets.asanas.len() - 1 {
-            yoga_assets.current_idx = 0;
-        }
+        yoga_assets.current_idx = 127;
         let name = yoga_assets.asanas[yoga_assets.current_idx].sanskrit.clone();
 
         let name_text = TextSection::new(
@@ -106,19 +117,22 @@ fn initial_pose(
         let mut change_me = asana_text.single_mut();
         *change_me = Text::from_sections([name_text]);
 
-        let joints = load_pose(name);
+        let pose_joints = load_pose(name, &yoga_assets);
         for (mut transform, bone) in bones.iter_mut() {
-            let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
-            *transform = Transform::from_matrix(mat.mat);
+            let pose_mat = pose_joints.iter().find(|j| j.joint_id == bone.id).unwrap();
+            *transform = Transform::from_matrix(pose_mat.mat);
         }
 }
 
 fn load_resources(mut commands: Commands, asset_server: Res<AssetServer>) {
+    //serialize_db();
+    let asana_data: AsanaData = deserialize_db();
     commands.insert_resource(YogaAssets {
         font: asset_server.load("fonts/Roboto-Regular.ttf"),
         font_color: Color::rgb_u8(207, 207, 207),
-        asanas: get_asanas_from_db(),
+        asanas: asana_data.asanas,
         current_idx: 0,
+        poses: asana_data.poses,
     });
 }
 
@@ -147,7 +161,7 @@ fn keyboard_input_system(
         let mut change_me = asana_text.single_mut();
         *change_me = Text::from_sections([name_text]);
 
-        let joints = load_pose(name);
+        let joints = load_pose(name, &yoga_assets);
         for (mut transform, bone) in bones.iter_mut() {
             let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
             *transform = Transform::from_matrix(mat.mat);
@@ -170,10 +184,10 @@ fn keyboard_input_system(
                 color: yoga_assets.font_color,
             }
         );
-
         let mut change_me = asana_text.single_mut();
         *change_me = Text::from_sections([name_text]);
-        let joints = load_pose(name);
+
+        let joints = load_pose(name, &yoga_assets);
         for (mut transform, bone) in bones.iter_mut() {
             let mat = joints.iter().find(|j| j.joint_id == bone.id).unwrap();
             *transform = Transform::from_matrix(mat.mat);
@@ -181,71 +195,100 @@ fn keyboard_input_system(
     }
 }
 
+#[cfg(not(target_arch="wasm32"))]
 fn get_asanas_from_db() -> Vec<AsanaDB> {
     let path = "./yogamatdb.sql";
     let db = Connection::open(path).expect("couldn't open database");
-    let sql = "select * from asana";
+    //let sql = "select asanaID, sanskritName, englishName, userNotes from asana";
+    let sql = r#"
+SELECT a.poseId, a.asanaID, b.sanskritName, b.englishName, b.userNotes
+FROM pose a, asana b
+WHERE a.asanaID = b.asanaID;
+"#;
     let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
     let response = stmt.query_map([], |row| {
         Ok(AsanaDB {
-            asana_id: row.get(0).expect("so may results"),
-            sanskrit: row.get(1).expect("so may results"),
-            english: row.get(2).expect("so may results"),
-            notes: row.get(3).expect("so may results"),
+            pose_id: row.get(0).expect("poseId"), 
+            asana_id: row.get(1).expect("asanaID"),
+            sanskrit: row.get(2).expect("sanskritName"),
+            english: row.get(3).expect("englishName"),
+            notes: row.get(4).expect("userNotes"),
         })
     }).expect("bad");
     let asanas = response.filter_map(|result| result.ok()).collect::<Vec<AsanaDB>>();
-    //println!("Found {} asanas", asanas.len());
+
     asanas
 }
 
-fn load_pose(sanskrit: String) -> Vec<JointMatrix> {
+#[cfg(not(target_arch="wasm32"))]
+fn serialize_db() {
+    let asanas = get_asanas_from_db();
+    let mut data = AsanaData {
+        asanas,
+        poses: HashMap::new(),
+    };
+
     let path = "./yogamatdb.sql";
     let db = Connection::open(path).expect("couldn't open database");
 
-    let sql = format!("select * from asana where sanskritName = '{}'", sanskrit);
-    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
-    let response = stmt.query_map([], |row| {
-        Ok(AsanaDB {
-            asana_id: row.get(0).expect("so may results"),
-            sanskrit: row.get(1).expect("so may results"),
-            english: row.get(2).expect("so may results"),
-            notes: row.get(3).expect("so may results"),
-        })
-    }).expect("bad");
-    let asanas = response.filter_map(|result| result.ok()).collect::<Vec<AsanaDB>>();
+    for asana in data.asanas.iter() {
 
-    let sql = format!("select poseId from pose where asanaID = {};", asanas[0].asana_id);
-    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
-    let response = stmt.query_map([], |row| {
-        let pose_id: i32 = row.get(0).expect("so may results");
-        Ok(pose_id)
-    }).expect("bad");
-    let pose_ids = response.filter_map(|result| result.ok()).collect::<Vec<i32>>();
-    
-    let sql = format!("select * from joint where poseID = {};", pose_ids[0]);
-    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
-    let response = stmt.query_map([], |row| {
-        Ok(Joint {
-            joint_id: row.get(0).expect("so may results"),
-            pose_id: row.get(1).expect("so may results"),
-            up_x: row.get(2).expect("so may results"),
-            up_y: row.get(3).expect("so may results"),
-            up_z: row.get(4).expect("so may results"),
-            forward_x: row.get(5).expect("so may results"),
-            forward_y: row.get(6).expect("so may results"),
-            forward_z: row.get(7).expect("so may results"),
-            origin_x: row.get(8).expect("so may results"),
-            origin_y: row.get(9).expect("so may results"),
-            origin_z: row.get(10).expect("so may results"),
-        })
-    }).expect("bad");
-    let joints = response.filter_map(|result| result.ok()).collect::<Vec<Joint>>();
+        let sql = format!("select * from joint where poseID = {};", asana.pose_id);
+        let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
+        let response = stmt.query_map([], |row| {
+            Ok(Joint {
+                joint_id: row.get(0).expect("so may results"),
+                pose_id: row.get(1).expect("so may results"),
+                up_x: row.get(2).expect("so may results"),
+                up_y: row.get(3).expect("so may results"),
+                up_z: row.get(4).expect("so may results"),
+                forward_x: row.get(5).expect("so may results"),
+                forward_y: row.get(6).expect("so may results"),
+                forward_z: row.get(7).expect("so may results"),
+                origin_x: row.get(8).expect("so may results"),
+                origin_y: row.get(9).expect("so may results"),
+                origin_z: row.get(10).expect("so may results"),
+            })
+        }).expect("bad");
+        let joints = response.filter_map(|result| result.ok()).collect::<Vec<Joint>>();
+        // do we store the matrices instead of these joints at some point in the future?
+        /*let matrices = joints.iter().map(|joint| JointMatrix {
+            mat: joint.matrix(),
+            joint_id: joint.joint_id,
+        }).collect::<Vec<JointMatrix>>();*/
+        let already = data.poses.insert(asana.pose_id, joints);
+        assert!(already.is_none());
+    }
+
+    let encoded: Vec<u8> = bincode::serialize(&data).unwrap();
+    let mut out_file = File::options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("out_db")
+        .expect("file couldn't be opened");
+    let success = out_file.write_all(&encoded);
+    match success {
+        Ok(_) => println!("encoded db written to out_db"),
+        Err(_) => panic!("encoded db file write failed"),
+    }
+}
+
+fn deserialize_db() -> AsanaData {
+    // asanas: Vec<AsanaDB>,
+    // poses: HashMap<i32, Vec<Joint>>,
+    let db = include_bytes!("../out_db");
+    let decoded = bincode::deserialize(db).unwrap();
+    decoded
+}
+
+fn load_pose(sanskrit: String, yoga: &YogaAssets) -> Vec<JointMatrix> {
+    let asana = yoga.asanas.iter().find(|asana| asana.sanskrit == sanskrit).unwrap();
+    let joints = yoga.poses.get(&asana.pose_id).unwrap();
     let mats = joints.iter().map(|joint| JointMatrix {
         mat: joint.matrix(),
         joint_id: joint.joint_id,
     }).collect::<Vec<JointMatrix>>();
-
     mats
 }
 
@@ -278,6 +321,7 @@ fn spawn_camera(mut commands: Commands) {
             ..Default::default()
         },
         PickingCameraBundle::default(),
+        //bevy_transform_gizmo::GizmoPickSource::default(),
     ));
 }
 
@@ -294,22 +338,6 @@ fn spawn_mat(
             transform: Transform::from_xyz(0.0, -109.5, 0.0),
             ..default()
         });
-
-    /*
-    commands.insert_resource(AmbientLight {
-        color: Color::rgb_u8(242, 226, 201),
-        brightness: 0.2,
-    });
-    let light = commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 500.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..default()
-    }).id();
-    */
 
     let height = 75.0;
     let lights = vec![Vec3::new(-50.0, height, 25.0), Vec3::new(50.0, height, 25.0),
@@ -343,19 +371,35 @@ fn spawn_bone(
     bone_parent: Entity,
     transform: Transform,
 ) -> Entity {
+    let pickable = true;
     let new_bone = commands.entity(bone_parent).add_children(|parent| {
-        parent
-            .spawn(PbrBundle {
-                mesh: meshes.add(make_bone_mesh(bone_cube)),
-                material,
-                transform,
-                ..default()
-            })
-            //.insert(PickableBundle::default())
-            .insert(Clickable)
-            .insert(Name::from(bone_cube.name.clone()))
-            .insert(Bone { id: bone_id })
-            .id()
+        if pickable {
+            parent
+                .spawn(PbrBundle {
+                    mesh: meshes.add(make_bone_mesh(bone_cube)),
+                    material,
+                    transform,
+                    ..default()
+                })
+                .insert(PickableBundle::default())
+                //.insert(bevy_transform_gizmo::GizmoTransformable)
+                .insert(Clickable)
+                .insert(Name::from(bone_cube.name.clone()))
+                .insert(Bone { id: bone_id })
+                .id()
+        } else {
+            parent
+                .spawn(PbrBundle {
+                    mesh: meshes.add(make_bone_mesh(bone_cube)),
+                    material,
+                    transform,
+                    ..default()
+                })
+                .insert(Clickable)
+                .insert(Name::from(bone_cube.name.clone()))
+                .insert(Bone { id: bone_id })
+                .id()
+            }
     });
     commands.entity(new_bone).add_children(|parent| {
         spawn_entity_axis(parent, &mut meshes, &mut materials, false);
@@ -369,7 +413,7 @@ fn spawn_skeleton(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let material = StandardMaterial {
-        base_color: Color::rgba_u8(123, 70, 0, 255).into(),
+        base_color: Color::rgba_u8(166, 116, 51, 255).into(),
         //base_color: Color::rgba_u8(133, 0, 0, 255).into(),
         reflectance: 0.2,
         perceptual_roughness: 0.95,
@@ -391,7 +435,8 @@ fn spawn_skeleton(
             material: material_handle.clone(),
             ..default()
         })
-        //.insert(PickableBundle::default())
+        .insert(PickableBundle::default())
+        //.insert(bevy_transform_gizmo::GizmoTransformable)
         .insert(Clickable)
         .insert(Name::from(name))
         .insert(Bone { id: bone_id })
@@ -453,9 +498,9 @@ fn spawn_skeleton(
         if i == 5 {
             // this is 0, 0, 0 in original
             // /Users/matt/Documents/former_desktop/My\ PROJECT/shared\ source/Skeleton.m
-            transform.translation += Vec3::new(0.0, l_spine_length / 5.0, 0.0);
+            transform.translation += Vec3::new(0.0, -hip_bone.y, 0.0);
         } else {
-            transform.translation += Vec3::new(0.0, l_spine_length / 5.0, 0.0);
+            transform.translation += Vec3::new(0.0, -l_spine_length / 5.0, 0.0);
         }
         prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
         bone_id += 1;
@@ -464,22 +509,31 @@ fn spawn_skeleton(
     let name = "Thoracic".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
     let t_spine_length = 19.0;
-    for _i in (1..=12).rev() {
+    for i in (1..=12).rev() {
         let mut transform = Transform::IDENTITY;
-        transform.translation += Vec3::new(0.0, t_spine_length / 12.0, 0.0);
+        if i == 12 {
+            transform.translation += Vec3::new(0.0, -l_spine_length / 5.0, 0.0);
+        } else {
+            transform.translation += Vec3::new(0.0, -t_spine_length / 12.0, 0.0);
+        }
         prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
         bone_id += 1;
     }
 
     let name = "Cervical".to_string();
-    let bone = skeleton_parts.get(&name).unwrap();
+    let mut bone = skeleton_parts.get(&name).unwrap().clone();
     let c_spine_length = 8.0;
     let mut c7 = prev_entity;
     for i in (1..=7).rev() {
         let mut transform = Transform::IDENTITY;
-        transform.translation += Vec3::new(0.0, c_spine_length / 7.0, 0.0);
-        prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
-        if i == 1 {
+        if i == 12 {
+            transform.translation += Vec3::new(0.0, -t_spine_length / 12.0, 0.0);
+        } else {
+            transform.translation += Vec3::new(0.0, -c_spine_length / 7.0, 0.0);
+        }
+        bone.name = format!("{} {}", name, i);
+        prev_entity = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, &bone, bone_id, prev_entity, transform);
+        if i == 7 {
             c7 = prev_entity;
         }
         bone_id += 1;
@@ -488,7 +542,7 @@ fn spawn_skeleton(
     let name = "Head".to_string();
     let bone = skeleton_parts.get(&name).unwrap();
     let mut transform = Transform::IDENTITY;
-    transform.translation += Vec3::new(0.0, c_spine_length / 7.0, 0.0);
+    transform.translation += Vec3::new(0.0, -c_spine_length / 7.0, 0.0);
     _ = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, c7, transform);
     bone_id += 1;
 
