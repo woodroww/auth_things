@@ -4,6 +4,7 @@ use bevy::{
     pbr::NotShadowCaster,
     prelude::*,
 };
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_mod_picking::*;
 use camera::{CameraPlugin, PanOrbitCamera};
 
@@ -25,6 +26,8 @@ struct MainMenu;
 #[derive(Component)]
 struct AsanaName;
 
+#[derive(Component)]
+struct ResetViewButton;
 #[derive(Component)]
 struct UpButton;
 #[derive(Component)]
@@ -68,13 +71,23 @@ struct AsanaData {
 //static DB: &[u8] = include_bytes!("../yogamatdb.sql");
 
 fn main() {
+
+    #[cfg(not(target_arch="wasm32"))]
+    let width = 1290.0;
+    #[cfg(not(target_arch="wasm32"))]
+    let height = 1400.0;
+    #[cfg(target_arch="wasm32")]
+    let width = 645.0;
+    #[cfg(target_arch="wasm32")]
+    let height = 700.0;
+
     App::new()
         .insert_resource(ClearColor(Color::hex("292929").unwrap()))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             window: WindowDescriptor {
                 title: "YogaMat".to_string(),
-                width: 1290.0,
-                height: 1400.0,
+                width,
+                height,
                 position: WindowPosition::At(Vec2::new(0.0, 0.0)),
                 ..default()
             },
@@ -92,6 +105,7 @@ fn main() {
         .add_startup_system(setup_ui)
         .add_startup_system(spawn_mat)
         .add_system(keyboard_input_system)
+        .add_system(button_clicked)
         .add_startup_system_to_stage(StartupStage::PreStartup, load_resources)
         .add_startup_system_to_stage(StartupStage::PostStartup, initial_pose)
         .run();
@@ -292,27 +306,29 @@ fn load_pose(sanskrit: String, yoga: &YogaAssets) -> Vec<JointMatrix> {
     mats
 }
 
-fn spawn_camera(mut commands: Commands) {
-
+fn default_viewpoint() -> (Transform, Vec3) {
     let mut transform = Transform::default();
-    transform.translation.x = -92.828;
-    transform.translation.y = -18.648;
-    transform.translation.z = 198.376;
-    transform.rotation.x = -0.136;
-    transform.rotation.y = -0.425;
-    transform.rotation.x = -0.028;
-
+    transform.translation.x = 108.36059;
+    transform.translation.y = -6.946327;
+    transform.translation.z = -190.86304;
+    transform.rotation.x = -0.019470416;
+    transform.rotation.y = 0.96626204;
+    transform.rotation.z = 0.076762356;
+    transform.rotation.w = 0.2450841;
     let focus = Vec3 {
-        x: -0.045,
-        y: -46.059,
-        z: 3.105,
+        x: 0.87379193,
+        y: -43.005276,
+        z: 7.39,
     };
+    (transform, focus)
+}
 
+fn spawn_camera(mut commands: Commands) {
+    let (transform, focus) = default_viewpoint();
     let camera = Camera3dBundle {
         transform,
         ..Default::default()
     };
-
     commands.spawn((
         camera,
         PanOrbitCamera {
@@ -325,16 +341,23 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
-
 fn spawn_mat(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let material = StandardMaterial {
+        base_color: Color::rgb(0.1, 0.1, 0.5).into(),
+        reflectance: 0.2,
+        perceptual_roughness: 0.95,
+        ..Default::default()
+    };
+    let material_handle = materials.add(material);
+
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Box::new(114.7, 1.0, 43.4))),
-            material: materials.add(Color::rgb(0.1, 0.1, 0.5).into()),
+            material: material_handle,
             transform: Transform::from_xyz(0.0, -109.5, 0.0),
             ..default()
         });
@@ -371,7 +394,7 @@ fn spawn_bone(
     bone_parent: Entity,
     transform: Transform,
 ) -> Entity {
-    let pickable = true;
+    let pickable = false;
     let new_bone = commands.entity(bone_parent).add_children(|parent| {
         if pickable {
             parent
@@ -606,6 +629,23 @@ fn spawn_skeleton(
     _ = spawn_bone(&mut commands, &mut meshes, material_handle.clone(), &mut materials, bone, bone_id, prev_entity, transform);
 }
 
+fn button_clicked(
+    mut query: Query<(&mut PanOrbitCamera, &mut Transform)>,
+    interactions: Query<&Interaction, (With<ResetViewButton>, Changed<Interaction>)>,
+) {
+    for interaction in &interactions {
+        if matches!(interaction, Interaction::Clicked) {
+            let (default_transform, default_focus) = default_viewpoint();
+            if let Ok((mut pan_orbit, mut transform)) = query.get_single_mut() {
+                pan_orbit.focus = default_focus;
+                *transform = default_transform;
+                pan_orbit.upside_down = false;
+                pan_orbit.radius = (transform.translation - default_focus).length();
+            }
+        }
+    }
+}
+
 fn setup_ui(
     mut commands: Commands,
     my_assets: Res<YogaAssets>,
@@ -626,7 +666,7 @@ fn setup_ui(
             commands.spawn(TextBundle {
                 style: Style {
                     align_self: AlignSelf::Center,
-                    margin: UiRect::all(Val::Percent(3.0)),
+                    margin: UiRect::all(Val::Percent(1.0)),
                     ..default()
                 },
                 text: Text::from_section(
@@ -643,20 +683,20 @@ fn setup_ui(
             .insert(AsanaName)
             .insert(Name::new("AsanaName"));
 
-            /*
         let button_margin = UiRect::all(Val::Percent(2.0));
         commands
             .spawn(ButtonBundle {
                 style: Style {
                     size: Size::new(Val::Px(80.0), Val::Px(40.0)),
                     align_self: AlignSelf::FlexEnd,
-                    justify_content: JustifyContent::FlexEnd,
+                    justify_content: JustifyContent::FlexStart,
                     margin: button_margin,
                     ..default()
                 },
+                background_color: Color::rgb_u8(28, 31, 33).into(),
                 //image: img.into(),
                 ..default()
-            }).insert(UpButton)
+            }).insert(ResetViewButton)
             .with_children(|commands| {
                 commands.spawn(TextBundle {
                     style: Style {
@@ -666,7 +706,7 @@ fn setup_ui(
                         ..default()
                     },
                     text: Text::from_section(
-                        "load me",
+                        "Reset View",
                         TextStyle {
                             font: my_assets.font.clone(),
                             font_size: 18.0,
@@ -677,7 +717,6 @@ fn setup_ui(
                     ..default()
                 });
             });
-            */
         });
 }
 
@@ -764,7 +803,7 @@ fn spawn_main_axis(
     let empty: Entity = commands
         .spawn_empty()
         .insert(TransformBundle::from_transform(empty_transform))
-        .insert(Visibility::default())
+        .insert(Visibility { is_visible: false })
         .insert(ComputedVisibility::default())
         .insert(Name::from("Main Axis"))
         .id();
@@ -779,7 +818,7 @@ fn spawn_main_axis(
                     mesh: meshes.add(Mesh::from(x)),
                     material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
                     transform,
-                    visibility: Visibility { is_visible: false },
+                    visibility: Visibility { is_visible: true },
                     ..default()
                 },
                 NotShadowCaster,
@@ -794,7 +833,7 @@ fn spawn_main_axis(
                     mesh: meshes.add(Mesh::from(y)),
                     material: materials.add(Color::rgb(0.0, 1.0, 0.0).into()),
                     transform,
-                    visibility: Visibility { is_visible: false },
+                    visibility: Visibility { is_visible: true },
                     ..default()
                 },
                 NotShadowCaster,
@@ -809,7 +848,7 @@ fn spawn_main_axis(
                     mesh: meshes.add(Mesh::from(z)),
                     material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
                     transform,
-                    visibility: Visibility { is_visible: false },
+                    visibility: Visibility { is_visible: true },
                     ..default()
                 },
                 NotShadowCaster,

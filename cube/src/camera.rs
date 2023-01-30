@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use bevy::input::mouse::{MouseMotion, MouseWheel};
+use bevy::prelude::*;
 
 pub struct CameraPlugin;
 
@@ -36,16 +36,27 @@ fn pan_orbit_camera(
     input_mouse: Res<Input<MouseButton>>,
     mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
 ) {
+/*
+    for (pan_orbit, transform, _projection) in query.iter_mut() {
+        println!(
+            "focus x:{} y:{} z:{} radiu:{}",
+            pan_orbit.focus.x, pan_orbit.focus.y, pan_orbit.focus.z, pan_orbit.radius
+        );
+        println!("trans x:{} y:{} z:{}", transform.translation.x, transform.translation.y, transform.translation.z);
+        println!("rotat x:{} y:{} z:{} w:{}", transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+    }
+*/
+
     // change input mapping for orbit and panning here
-    #[cfg(not(target_arch="wasm32"))]
+    #[cfg(not(target_arch = "wasm32"))]
     let orbit_button = MouseButton::Middle;
-    #[cfg(not(target_arch="wasm32"))]
+    #[cfg(not(target_arch = "wasm32"))]
     let pan_button = MouseButton::Right;
 
-    #[cfg(target_arch="wasm32")]
+    #[cfg(target_arch = "wasm32")]
     let orbit_button = MouseButton::Left;
-    #[cfg(target_arch="wasm32")]
-    let pan_button = MouseButton::Right;
+    #[cfg(target_arch = "wasm32")]
+    let pan_button = MouseButton::Middle;
 
     let mut pan = Vec2::ZERO;
     let mut rotation_move = Vec2::ZERO;
@@ -130,4 +141,3 @@ fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
     let window = Vec2::new(window.width() as f32, window.height() as f32);
     window
 }
-

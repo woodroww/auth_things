@@ -4,6 +4,16 @@ members=[
 ]
 resolver="2"
 
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z" 
+lto = "fat"
+codegen-units = 1
+
+
 [workspace.dependencies]
 bevy = { version = "0.9.1", features = ["dynamic"] }
 
