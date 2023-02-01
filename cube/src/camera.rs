@@ -1,5 +1,9 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
+use bevy::input::InputSystem;
 use bevy::prelude::*;
+use bevy_egui::{EguiContext, EguiSystem};
+
+use crate::OccupiedScreenSpace;
 
 pub struct CameraPlugin;
 
@@ -35,24 +39,31 @@ fn pan_orbit_camera(
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
     mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
+    occupied_screen_space: Res<OccupiedScreenSpace>,
 ) {
-/*
-    for (pan_orbit, transform, _projection) in query.iter_mut() {
-        println!(
-            "focus x:{} y:{} z:{} radiu:{}",
-            pan_orbit.focus.x, pan_orbit.focus.y, pan_orbit.focus.z, pan_orbit.radius
-        );
-        println!("trans x:{} y:{} z:{}", transform.translation.x, transform.translation.y, transform.translation.z);
-        println!("rotat x:{} y:{} z:{} w:{}", transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+    let window = windows.get_primary().unwrap();
+    if let Some(mouse_position) = window.cursor_position() {
+        if mouse_position.x < occupied_screen_space.left as f32
+            || mouse_position.x
+                > window.physical_width() as f32 - occupied_screen_space.right as f32
+        {
+            return;
+        }
+        if mouse_position.y < occupied_screen_space.top as f32
+            || mouse_position.y
+                > window.physical_height() as f32 - occupied_screen_space.bottom as f32
+        {
+            return;
+        }
     }
-*/
 
-    // change input mapping for orbit and panning here
     #[cfg(not(target_arch = "wasm32"))]
     let orbit_button = MouseButton::Middle;
     #[cfg(not(target_arch = "wasm32"))]
     let pan_button = MouseButton::Right;
 
+    // change input mapping for orbit and panning here,
+    // a right click is going to bring up browser right click menu
     #[cfg(target_arch = "wasm32")]
     let orbit_button = MouseButton::Left;
     #[cfg(target_arch = "wasm32")]
