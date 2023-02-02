@@ -48,9 +48,6 @@ pub struct YogaAssets {
 }
 
 #[derive(Component)]
-struct Clickable;
-
-#[derive(Component)]
 struct Bone {
     id: i32,
 }
@@ -138,7 +135,7 @@ fn main() {
         .register_type::<PanOrbitCamera>() // bevy_inspector_egui for inspecting
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
-        //.add_plugin(bevy_transform_gizmo::TransformGizmoPlugin::new(Quat::default()))
+        .add_plugin(bevy_transform_gizmo::TransformGizmoPlugin::new(Quat::default()))
         .add_startup_system(spawn_skeleton)
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_main_axis)
@@ -215,55 +212,19 @@ fn update_camera_transform_system(
     let window = windows.get_primary().unwrap();
     let viewport_width = window.physical_width() - occupied_screen_space.left - occupied_screen_space.right;
     let viewport_height =  window.physical_height() - occupied_screen_space.top - occupied_screen_space.bottom;
-    let mut camera = camera_query.single_mut();
-    let mut viewport = camera.viewport.as_mut().unwrap();
-    viewport.physical_position.x = occupied_screen_space.left;
-    viewport.physical_position.y = occupied_screen_space.top;
-    viewport.physical_size.x = viewport_width;
-    viewport.physical_size.y = viewport_height;
+    // I guess the gizmo adds a camera ???
+    for mut camera in camera_query.iter_mut() {
+        match camera.viewport {
+            Some(ref mut viewport) => {
+                viewport.physical_position.x = occupied_screen_space.left;
+                viewport.physical_position.y = occupied_screen_space.top;
+                viewport.physical_size.x = viewport_width;
+                viewport.physical_size.y = viewport_height;
+            }
+            None => {}
+        }
+    }
 }
-    /*
-
-    occupied_screen_space: Res<OccupiedScreenSpace>,
-    original_camera_transform: Res<OriginalCameraTransform>,
-    windows: Res<Windows>,
-    mut camera_query: Query<(&Projection, &mut Transform)>,
-    pan_orbit_camera: Query<&PanOrbitCamera>,
-
-    let (camera_projection, mut transform) = match camera_query.get_single_mut() {
-        Ok((Projection::Perspective(projection), transform)) => (projection, transform),
-        _ => unreachable!(),
-    };
-    let camera_target = pan_orbit_camera.single().focus;
-
-    let distance_to_target = (camera_target - transform.translation).length();
-
-// https://docs.unity3d.com/Manual/FrustumSizeAtDistance.html
- // var frustumHeight = 2.0f * distance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-    // The vertical field of view (FOV) in radians.
-    // Defaults to a value of π/4 radians or 45 degrees.
-    // camera_projectction.fov
-    // so we're talking about a frame somewhere between the near and far planes of the frustum
-    let frustum_height = 2.0 * distance_to_target * (camera_projection.fov * 0.5).tan();
-    let frustum_width = frustum_height * camera_projection.aspect_ratio;
-
-    let window = windows.get_primary().unwrap();
-
-    let left_taken = occupied_screen_space.left / window.width();
-    let right_taken = occupied_screen_space.right / window.width();
-    let top_taken = occupied_screen_space.top / window.height();
-    let bottom_taken = occupied_screen_space.bottom / window.height();
-
-    // mul_vec3
-    // Multiplies a quaternion and a 3D vector, returning the rotated vector.
-
-    transform.translation = original_camera_transform.translation
-        + transform.rotation.mul_vec3(Vec3::new(
-            (right_taken - left_taken) * frustum_width * 0.5,
-            (top_taken - bottom_taken) * frustum_height * 0.5,
-            0.0,
-        ));
-    */
 
 fn initial_pose(
     mut yoga_assets: ResMut<YogaAssets>,
@@ -335,92 +296,6 @@ fn keyboard_input_system(
     set_pose(yoga_assets, bones, asana_text);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn get_asanas_from_db() -> Vec<AsanaDB> {
-    let path = "./yogamatdb.sql";
-    let db = Connection::open(path).expect("couldn't open database");
-    //let sql = "select asanaID, sanskritName, englishName, userNotes from asana";
-    let sql = r#"
-SELECT a.poseId, a.asanaID, b.sanskritName, b.englishName, b.userNotes
-FROM pose a, asana b
-WHERE a.asanaID = b.asanaID;
-"#;
-    let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
-    let response = stmt
-        .query_map([], |row| {
-            Ok(AsanaDB {
-                pose_id: row.get(0).expect("poseId"),
-                asana_id: row.get(1).expect("asanaID"),
-                sanskrit: row.get(2).expect("sanskritName"),
-                english: row.get(3).expect("englishName"),
-                notes: row.get(4).expect("userNotes"),
-            })
-        })
-        .expect("bad");
-    let asanas = response
-        .filter_map(|result| result.ok())
-        .collect::<Vec<AsanaDB>>();
-
-    asanas
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn serialize_db() {
-    let asanas = get_asanas_from_db();
-    let mut data = AsanaData {
-        asanas,
-        poses: HashMap::new(),
-    };
-
-    let path = "./yogamatdb.sql";
-    let db = Connection::open(path).expect("couldn't open database");
-
-    for asana in data.asanas.iter() {
-        let sql = format!("select * from joint where poseID = {};", asana.pose_id);
-        let mut stmt = db.prepare(&sql).expect("trouble preparing statement");
-        let response = stmt
-            .query_map([], |row| {
-                Ok(Joint {
-                    joint_id: row.get(0).expect("so may results"),
-                    pose_id: row.get(1).expect("so may results"),
-                    up_x: row.get(2).expect("so may results"),
-                    up_y: row.get(3).expect("so may results"),
-                    up_z: row.get(4).expect("so may results"),
-                    forward_x: row.get(5).expect("so may results"),
-                    forward_y: row.get(6).expect("so may results"),
-                    forward_z: row.get(7).expect("so may results"),
-                    origin_x: row.get(8).expect("so may results"),
-                    origin_y: row.get(9).expect("so may results"),
-                    origin_z: row.get(10).expect("so may results"),
-                })
-            })
-            .expect("bad");
-        let joints = response
-            .filter_map(|result| result.ok())
-            .collect::<Vec<Joint>>();
-        // do we store the matrices instead of these joints at some point in the future?
-        /*let matrices = joints.iter().map(|joint| JointMatrix {
-            mat: joint.matrix(),
-            joint_id: joint.joint_id,
-        }).collect::<Vec<JointMatrix>>();*/
-        let already = data.poses.insert(asana.pose_id, joints);
-        assert!(already.is_none());
-    }
-
-    let encoded: Vec<u8> = bincode::serialize(&data).unwrap();
-    let mut out_file = File::options()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("out_db")
-        .expect("file couldn't be opened");
-    let success = out_file.write_all(&encoded);
-    match success {
-        Ok(_) => println!("encoded db written to out_db"),
-        Err(_) => panic!("encoded db file write failed"),
-    }
-}
-
 fn deserialize_db() -> AsanaData {
     // asanas: Vec<AsanaDB>,
     // poses: HashMap<i32, Vec<Joint>>,
@@ -485,7 +360,7 @@ fn spawn_camera(mut commands: Commands) {
             ..Default::default()
         },
         PickingCameraBundle::default(),
-        //bevy_transform_gizmo::GizmoPickSource::default(),
+        bevy_transform_gizmo::GizmoPickSource::default(),
     ));
 
     commands.insert_resource(OriginalCameraTransform(transform));
@@ -550,7 +425,7 @@ fn spawn_bone(
     bone_parent: Entity,
     transform: Transform,
 ) -> Entity {
-    let pickable = false;
+    let pickable = true;
     let new_bone = commands.entity(bone_parent).add_children(|parent| {
         if pickable {
             parent
@@ -561,8 +436,7 @@ fn spawn_bone(
                     ..default()
                 })
                 .insert(PickableBundle::default())
-                //.insert(bevy_transform_gizmo::GizmoTransformable)
-                .insert(Clickable)
+                .insert(bevy_transform_gizmo::GizmoTransformable)
                 .insert(Name::from(bone_cube.name.clone()))
                 .insert(Bone { id: bone_id })
                 .id()
@@ -574,7 +448,6 @@ fn spawn_bone(
                     transform,
                     ..default()
                 })
-                .insert(Clickable)
                 .insert(Name::from(bone_cube.name.clone()))
                 .insert(Bone { id: bone_id })
                 .id()
@@ -615,8 +488,7 @@ fn spawn_skeleton(
             ..default()
         })
         .insert(PickableBundle::default())
-        //.insert(bevy_transform_gizmo::GizmoTransformable)
-        .insert(Clickable)
+        .insert(bevy_transform_gizmo::GizmoTransformable)
         .insert(Name::from(name))
         .insert(Bone { id: bone_id })
         .id();
