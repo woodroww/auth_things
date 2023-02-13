@@ -135,7 +135,7 @@ fn main() {
         .register_type::<PanOrbitCamera>() // bevy_inspector_egui for inspecting
         .add_plugin(CameraPlugin)
         .add_plugins(DefaultPickingPlugins)
-        .add_plugin(bevy_transform_gizmo::TransformGizmoPlugin::new(Quat::default()))
+        .add_plugin(bevy_transform_gizmo::TransformGizmoPlugin)
         .add_startup_system(spawn_skeleton)
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_main_axis)

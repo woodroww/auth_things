@@ -1,6 +1,7 @@
 [workspace]
 members=[
-"cube"
+"yogamat",
+"backend",
 ]
 resolver="2"
 
@@ -15,6 +16,5 @@ codegen-units = 1
 
 
 [workspace.dependencies]
-bevy = { version = "0.9.1", features = ["dynamic"] }
 
 
