@@ -36,17 +36,18 @@ impl TypedSession {
         self.0.get(Self::NONCE_KEY) 
     }
     pub fn generate_and_save_state(&self) -> Result<String, SessionInsertError> {
-        let result = TypedSession::make_random_state();
+        let result = TypedSession::random_base64();
         self.0.insert(Self::STATE_KEY, result.clone())?;
         Ok(result)
     }
     pub fn generate_and_save_code_challenge(&self) -> Result<String, SessionInsertError> {
-        let result = TypedSession::make_random_state();
-        self.0.insert(Self::CODE_CHALLENGE_KEY, result.clone())?; 
+        let verifier = TypedSession::random_base64();
+        let result = TypedSession::hash_challenge(verifier.clone());
+        self.0.insert(Self::CODE_CHALLENGE_KEY, verifier)?; 
         Ok(result)
     }
     pub fn generate_and_save_nonce(&self) -> Result<String, SessionInsertError> {
-        let result = TypedSession::make_random_state();
+        let result = TypedSession::random_base64();
         self.0.insert(Self::NONCE_KEY, result.clone())?; 
         Ok(result)
     }
@@ -54,17 +55,17 @@ impl TypedSession {
         self.0.purge()
     }
 
-    fn make_random_state() -> String {
+    fn random_base64() -> String {
         let mut generator = rand::thread_rng();
-        let rando: u64 = generator.gen();
-        let rando_string = rando.to_string();
-        let oauth_code = encode(&rando_string);
+        let random: u64 = generator.gen();
+        CUSTOM_ENGINE.encode(random.to_string())
+    }
+
+    fn hash_challenge(challenge: String) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(oauth_code.as_bytes());
-        let hashed_oauth_code = hasher.finalize();
-        let base64_encoded = CUSTOM_ENGINE.encode(hashed_oauth_code);
-        //let url_encoded_code_challenge = encode(&base64_encoded);
-        base64_encoded
+        hasher.update(challenge.as_bytes());
+        let hashed_challenge = hasher.finalize();
+        CUSTOM_ENGINE.encode(hashed_challenge)
     }
 }
 

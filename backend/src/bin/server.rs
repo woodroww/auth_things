@@ -27,24 +27,42 @@ async fn hello(
 ) -> Result<HttpResponse, actix_web::Error> {
     // OAuth flow step 2.
     // The client redirects your browser to the authorization server.
-    // It includes with the request, the client id, redirect uri, the response type, and one or more scopes it needs.
+    // It includes with the request, the client id, redirect uri, the response type, and one or
+    // more scopes it needs.
 
+    // the url of the OAuth server
     let auth_url = "aquiles.local";
+    // client_id - this identifies the application you are loggin into
+    // this is refered to as the client in OAuth vocabulary
     let client_id = app_data.client_id.expose_secret();
-    let state = session.generate_and_save_state().unwrap();
-    let url_encoded_code_challenge = session.generate_and_save_code_challenge().unwrap();
-    let nonce = session.generate_and_save_nonce().unwrap();
+    // redirect_uri - this is the URL in your application to which the OAuth server will redirect
+    // the user after they log in
     let redirect_ip = "matts-imac.local";
     let redirect_port = "3000";
+    // state - optional, but it is useful for preventing various security isssues. Set to a large
+    // random string or maybe some data with an appended random string. Then verify it after login.
+    let state = session.generate_and_save_state().unwrap();
+    // response_type - this indicates to OAuth server you are using the 'code' grant.
+    let response_type = "code";
+    // scope - optional, in some other modes it will be required, page 26 in book
+    let scopes = urlencoding::encode("profile offline_access openi");
+    // code_challenge - optional, provides support for PKCE
+    let code_challenge = session.generate_and_save_code_challenge().unwrap();
+    // code_challenge_method - optional, if your implement PKCE you must specify how your
+    // code_challenge was created (plain or S256)
+    // nonce - optional, used for OpenID Connect
+    let nonce = session.generate_and_save_nonce().unwrap();
 
     let login_uri = format!("http://{}:9011/oauth2/authorize?", auth_url)
      + &format!("client_id={}&", client_id)
-     + &format!("response_type=code&")
+     + &format!("response_type={}&", response_type)
      + &format!("redirect_uri=") + &urlencoding::encode(&format!("http://{}:{}/", redirect_ip, redirect_port))
      + &format!("oauth-redirect&")
      + &format!("state={}&", state)
-     + &format!("code_challenge={}&", url_encoded_code_challenge)
-     + &format!("code_challenge_method=S256");
+     + &format!("scope={}&", scopes)
+     + &format!("code_challenge={}&", code_challenge)
+     + &format!("code_challenge_method=S256&")
+     + &format!("nonce={}", nonce);
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
@@ -143,10 +161,14 @@ async fn main() -> std::io::Result<()> {
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
+                    // If the cookie is set as secure, it will only be transmitted when the connection is secure
+                    // (using `https`).
                     .cookie_secure(false)
                     .session_lifecycle(
                         PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
                     )
+                    // the default is .cookie_http_only(true)
+                    // the default is .cookie_content_security(CookieContentSecurity::Private) // encrypted but not signed
                     .build(),
             )
     })
