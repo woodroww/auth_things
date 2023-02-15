@@ -8,6 +8,7 @@ use actix_web::{
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
 use backend::session_state::TypedSession;
 use dotenv;
+use secrecy::{Secret, ExposeSecret};
 use tracing_actix_web::TracingLogger;
 
 use oauth2::{basic::BasicClient, PkceCodeVerifier};
@@ -18,11 +19,12 @@ use oauth2::{
 
 struct YogaAppData {
     oauth_client: BasicClient,
+    oauth_server: String,
+    client_id: Secret<String>,
     host: String,
     port: String,
 }
 
-#[get("/")]
 async fn hello(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
@@ -47,7 +49,7 @@ async fn hello(
         .url();
 
     // Save the state token to verify later.
-    session.set_state(csrf_token);
+    session.set_state(csrf_token)?;
 
     // The web page the user sees with the link to the authorization server
     Ok(HttpResponse::Ok()
@@ -73,7 +75,6 @@ pub struct LoginRedirect {
     state: String,
 }
 
-/*
 async fn logout(
     session: TypedSession,
     app_data: web::Data<YogaAppData>,
@@ -81,10 +82,14 @@ async fn logout(
     session.purge();
     let logout_endpoint = format!("http://{}/oauth2/logout?client_id={}", app_data.oauth_server, app_data.client_id.expose_secret());
 
-    let response = reqwest::Client::new()
+    Ok(HttpResponse::SeeOther()
+        .insert_header((actix_web::http::header::LOCATION, logout_endpoint))
+        .finish())
+        /*
+    reqwest::Client::new()
         .get(&logout_endpoint)
         .send()
-        .await.unwrap();
+        .await.unwrap()
 
     let status = response.status();
     let response_text = response.text().await.unwrap();
@@ -93,8 +98,6 @@ async fn logout(
     } else {
         println!("status: {}\n{}", status, response_text);
     }
-
-    // a(href=fusionAuthURL+'/oauth2/logout/?client_id='+clientId) Logout
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
@@ -111,8 +114,8 @@ async fn logout(
 </body>
 </html>"#
         )))
-}
         */
+}
 
 async fn oauth_login_redirect(
     app_data: web::Data<YogaAppData>,
@@ -203,7 +206,7 @@ async fn main() -> std::io::Result<()> {
     let redirect_uri = format!("http://{}:{}/oauth-redirect", host, port);
 
     let client = BasicClient::new(
-        ClientId::new(client_id),
+        ClientId::new(client_id.clone()),
         Some(ClientSecret::new(client_secret)),
         AuthUrl::new(fusion_uri).unwrap(),
         Some(TokenUrl::new(token_endpoint).unwrap()),
@@ -213,16 +216,17 @@ async fn main() -> std::io::Result<()> {
     let yoga_data = web::Data::new(YogaAppData {
         oauth_client: client,
         host,
-        port
+        port,
+        oauth_server,
+        client_id: Secret::new(client_id),
     });
 
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            .service(hello)
+            .route("/", web::get().to(hello))
             .route("/oauth-redirect", web::get().to(oauth_login_redirect))
-            //.route("/logout", web::get().to(logout))
-            //.route("/token-callback", web::get().to(token_exchange))
+            .route("/logout", web::get().to(logout))
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
