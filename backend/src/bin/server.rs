@@ -38,8 +38,8 @@ async fn main() -> std::io::Result<()> {
 
     let yoga_data = web::Data::new(YogaAppData {
         oauth_client: client,
-        host: configuration.application.host,
-        port: configuration.application.port,
+        host: configuration.application.host.clone(),
+        port: configuration.application.port.clone(),
         oauth_server: configuration.application.oauth_server,
         client_id: Secret::new(configuration.application.client_id.clone()),
     });
@@ -64,7 +64,7 @@ async fn main() -> std::io::Result<()> {
                     .build(),
             )
     })
-    .bind(("127.0.0.1", 3000))?
+    .bind((configuration.application.host, configuration.application.port.parse::<u16>().unwrap()))?
     .run()
     .await
 }
