@@ -52,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(backend::routes::oauth::hello))
             .route("/oauth-redirect", web::get().to(backend::routes::oauth::oauth_login_redirect))
             .route("/logout", web::get().to(backend::routes::oauth::logout))
+            .route("/health_check", web::get().to(backend::routes::health_check))
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))

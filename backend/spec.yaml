@@ -16,7 +16,7 @@ services:
       # Continuous Deployment, here we come!
       deploy_on_push: true
       # !!! Fill in with your details
-      repo: woodroww/zero2prod 
+      repo: woodroww/yoga_mat
     # Active probe used by DigitalOcean's to ensure our application is healthy
     health_check:
       # The path to our health check endpoint!
@@ -36,6 +36,10 @@ services:
       - key: APP_APPLICATION__BASE_URL
         scope: RUN_TIME
         value: ${APP_URL}
-      - key: APP_DATABASE__USERNAME
+      - key: APP_APPLICATION__CLIENT_ID
         scope: RUN_TIME
-        value: ${newsletter_db.USERNAME}
+        value: ${idk.CLIENT_ID}
+      - key: APP_APPLICATION__CLIENT_SECRET
+        scope: RUN_TIME
+        value: ${idk.CLIENT_SECRET}
+
