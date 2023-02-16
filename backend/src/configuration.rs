@@ -35,8 +35,8 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     // (we must start where the config folder is located)
     let configuration_directory = base_path.join("configuration");
     // APP_ENVIRONMENT is set in Dockerfile or wherever
-    // - to 'production' to make a production environment
-    // - to 'local' to make a local developement environment
+    // - 'ENV APP_ENVIRONMENT production' to make a production environment
+    // - 'ENV APP_ENVIRONMENT local' to make a local developement environment
     let environment: Environment = std::env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| "local".into())
         .try_into()
