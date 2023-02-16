@@ -23,9 +23,10 @@ async fn main() -> std::io::Result<()> {
 
     let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
     let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
+
     let redirect_uri = format!(
         "http://{}:{}/oauth-redirect",
-        configuration.application.host, configuration.application.port
+        configuration.application.oauth_redirect_host, configuration.application.port
     );
 
     let client = BasicClient::new(
@@ -42,6 +43,7 @@ async fn main() -> std::io::Result<()> {
         port: configuration.application.port.clone(),
         oauth_server: configuration.application.oauth_server,
         client_id: Secret::new(configuration.application.client_id.clone()),
+        oauth_redirect_host: configuration.application.oauth_redirect_host,
     });
 
     HttpServer::new(move || {

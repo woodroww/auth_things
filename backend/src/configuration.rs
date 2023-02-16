@@ -14,6 +14,7 @@ pub struct ApplicationSettings {
     pub oauth_server: String,
     pub client_secret: String,
     pub client_id: String,
+    pub oauth_redirect_host: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -26,6 +27,7 @@ pub struct YogaAppData {
     pub oauth_server: String,
     pub client_id: Secret<String>,
     pub host: String,
+    pub oauth_redirect_host: String,
     pub port: String,
 }
 

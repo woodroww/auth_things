@@ -1,3 +1,4 @@
 application:
-  host: matts-imac.local 
+  host: 0.0.0.0
+  oauth_redirect_host: aquiles.local
   oauth_server: aquiles.local:9011

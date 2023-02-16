@@ -156,7 +156,7 @@ pub async fn oauth_login_redirect(
         panic!();
     }
 
-    let logout_uri = format!("http://{}:{}/logout", app_data.host, app_data.port);
+    let logout_uri = format!("http://{}:{}/logout", app_data.oauth_redirect_host, app_data.port);
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
