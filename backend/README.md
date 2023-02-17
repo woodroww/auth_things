@@ -16,3 +16,5 @@ sudo docker run -env APP_APPLICATION__CLIENT_ID -env APP_APPLICATION__CLIENT_SEC
 sudo docker run --env-file ./.env -d -p 3000:3000 yogamat
 ### stop a running container
 sudo docker stop container_id
+
+
