@@ -36,10 +36,10 @@ services:
       - key: APP_APPLICATION__BASE_URL
         scope: RUN_TIME
         value: ${APP_URL}
-      # - key: APP_APPLICATION__CLIENT_ID
-      # scope: RUN_TIME
-      # value: ${idk.CLIENT_ID}
-      # - key: APP_APPLICATION__CLIENT_SECRET
-      # scope: RUN_TIME
-      # value: ${idk.CLIENT_SECRET}
+      - key: APP_APPLICATION__CLIENT_ID
+        scope: RUN_TIME
+        value: ${yogamat.CLIENT_ID}
+      - key: APP_APPLICATION__CLIENT_SECRET
+        scope: RUN_TIME
+        value: ${yogamat.CLIENT_SECRET}
 
