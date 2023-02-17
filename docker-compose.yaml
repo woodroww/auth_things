@@ -1,0 +1,16 @@
+services:
+  server:
+    build: backend
+    ports:
+      - 3000:3000
+  yoga:
+    build: yogamat
+    volumes:
+      - www:/usr/share/yogamat
+        #web:
+        #build: frontend
+        #volumes:
+        #- www:/frontend/yewapp/dist
+volumes:
+  www: 
+

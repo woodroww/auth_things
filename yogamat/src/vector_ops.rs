@@ -1,3 +1,4 @@
+/*
 use bevy::prelude::Vec3;
 
 fn vector_magnitude(vector: &[f32; 3]) -> f32 {
@@ -49,4 +50,4 @@ fn calculate_vertex_normals(triangles: &Vec<[[f32; 3]; 3]>) -> Vec<Vec3> {
     vertex_normals.resize(triangle_count * 3, [0.0, 0.0, 0.0]);
     todo!()
 }
-
+*/
