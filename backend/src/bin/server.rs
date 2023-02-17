@@ -31,7 +31,7 @@ async fn main() -> std::io::Result<()> {
 
     let client = BasicClient::new(
         ClientId::new(configuration.application.client_id.clone()),
-        Some(ClientSecret::new(configuration.application.client_secret)),
+        Some(ClientSecret::new(configuration.application.client_secret.clone())),
         AuthUrl::new(fusion_uri).unwrap(),
         Some(TokenUrl::new(token_endpoint).unwrap()),
     )
@@ -43,6 +43,7 @@ async fn main() -> std::io::Result<()> {
         port: configuration.application.port.clone(),
         oauth_server: configuration.application.oauth_server,
         client_id: Secret::new(configuration.application.client_id.clone()),
+        client_secret: Secret::new(configuration.application.client_secret.clone()),
         oauth_redirect_host: configuration.application.oauth_redirect_host,
     });
 
@@ -53,6 +54,7 @@ async fn main() -> std::io::Result<()> {
             .route("/oauth-redirect", web::get().to(backend::routes::oauth::oauth_login_redirect))
             .route("/logout", web::get().to(backend::routes::oauth::logout))
             .route("/health_check", web::get().to(backend::routes::health_check))
+            .route("/poses", web::get().to(backend::routes::poses::look_at_poses))
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))

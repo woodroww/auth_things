@@ -6,7 +6,7 @@ region: nyc3
 services:
   - name: yogamat
     # Relative to the repository root
-    dockerfile_path: Dockerfile
+    dockerfile_path: ./backend/Dockerfile
     source_dir: .
     github:
       # Depending on when you created the repository,
@@ -42,4 +42,3 @@ services:
       - key: APP_APPLICATION__CLIENT_SECRET
         scope: RUN_TIME
         value: ${yogamat.CLIENT_SECRET}
-

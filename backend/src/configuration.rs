@@ -26,6 +26,7 @@ pub struct YogaAppData {
     pub oauth_client: BasicClient,
     pub oauth_server: String,
     pub client_id: Secret<String>,
+    pub client_secret: Secret<String>,
     pub host: String,
     pub oauth_redirect_host: String,
     pub port: String,

@@ -1,4 +1,5 @@
 pub mod oauth;
+pub mod poses;
 
 use actix_web::HttpResponse;
 

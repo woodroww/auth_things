@@ -1,12 +1,9 @@
 use crate::configuration::YogaAppData;
 use crate::session_state::TypedSession;
-use actix_web::{
-    http::header::ContentType, web, HttpResponse,
-};
-use oauth2::PkceCodeVerifier;
-use oauth2::{
-    AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope,
-};
+use actix_web::{http::header::ContentType, web, HttpResponse};
+use oauth2::basic::BasicTokenType;
+use oauth2::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
+use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, TokenResponse};
 
 use secrecy::ExposeSecret;
 
@@ -30,6 +27,9 @@ pub async fn hello(
         // Set the desired scopes.
         .add_scope(Scope::new("read".to_string()))
         .add_scope(Scope::new("write".to_string()))
+        .add_scope(Scope::new("openid".to_string()))
+        .add_scope(Scope::new("profile".to_string()))
+        .add_scope(Scope::new("offline_access".to_string())) // refresh tokens
         // Set the PKCE code challenge.
         .set_pkce_challenge(pkce_challenge)
         .url();
@@ -106,6 +106,68 @@ pub async fn logout(
             )))
             */
 }
+/*
+fn revoke_token() {
+    // Revoke the obtained token
+    let token_response = token_response.unwrap();
+    let token_to_revoke: StandardRevocableToken = match token_response.refresh_token() {
+        Some(token) => token.into(),
+        None => token_response.access_token().into(),
+    };
+
+    client
+        .revoke_token(token_to_revoke)
+        .unwrap()
+        .request(http_client)
+        .expect("Failed to revoke token");
+}
+    */
+
+pub async fn receive_token(
+    app_data: web::Data<YogaAppData>,
+    token: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
+    session: TypedSession,
+) -> Result<HttpResponse, actix_web::Error> {
+    println!("matts fun token:\n{:#?}", token);
+
+    // The access token issued by the authorization server.
+    let jwt = token.access_token();
+    session.set_access_token(jwt.clone())?;
+
+    // JWT header
+    //let header: Header = decode_header(&jwt).unwrap();
+    //let kid = header.kid.clone().unwrap();
+    // book has
+    // accessToken, idToken, refreshToken
+    // https://fusionauth.io/learn/expert-advice/tokens/jwt-components-explained
+    // nonce can be verified if I knew how to send on, it is for openid
+
+    match token.refresh_token() {
+        Some(refresh) => session.set_refresh_token(refresh.clone())?,
+        None => {}
+    }
+
+    let logout_uri = format!(
+        "http://{}:{}/logout",
+        app_data.oauth_redirect_host, app_data.port
+    );
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType::html())
+        .body(format!(
+            r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <title>Logged In</title>
+</head>
+<body>
+<p>You have been logged in.</p>
+<a href={}>Logout</a>
+</body>
+</html>"#,
+            logout_uri,
+        )))
+}
 
 pub async fn oauth_login_redirect(
     app_data: web::Data<YogaAppData>,
@@ -128,7 +190,7 @@ pub async fn oauth_login_redirect(
         // verify the states are the same
         if login.state != *state.secret() {
             tracing::info!("State doesn't match. Something is terribly wrong.");
-            // we have been intercepted hacked bamboozled,
+            // we may have been intercepted hacked or bamboozled
             // also need to send something back better than this
             let response = HttpResponse::SeeOther()
                 .insert_header((actix_web::http::header::LOCATION, "/"))
@@ -149,15 +211,14 @@ pub async fn oauth_login_redirect(
         // OAuth flow
         // 7. The authorization server verifies the data and respondes with an access token
         if let Ok(token) = token_response {
-            println!("matts fun token:\n{:#?}", token);
+            // this is the happy path
+            return receive_token(app_data, token, session).await;
         }
     } else {
         tracing::info!("there is no session state or no verifier");
-        panic!();
     }
 
-    let logout_uri = format!("http://{}:{}/logout", app_data.oauth_redirect_host, app_data.port);
-
+    // this is going to be the error response
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(format!(
@@ -165,15 +226,11 @@ pub async fn oauth_login_redirect(
 <html lang="en">
 <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8">
-    <title>Logged In</title>
+    <title>Auth Error</title>
 </head>
 <body>
-<p>You have been logged in.</p>
-<p>user_state {}</p>
-<p>code {}</p>
-<a href={}>Logout</a>
+<p>Something went wrong with OAuth</p>
 </body>
 </html>"#,
-            login.state, login.code, logout_uri,
         )))
 }
