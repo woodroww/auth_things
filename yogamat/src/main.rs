@@ -282,18 +282,13 @@ fn keyboard_input_system(
     asana_text: Query<&mut Text, With<AsanaName>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Up) {
-        yoga_assets.current_idx += 1;
-        if yoga_assets.current_idx > yoga_assets.asanas.asanas.len() - 1 {
-            yoga_assets.current_idx = 0;
-        }
+        yoga_assets.current_idx = (yoga_assets.current_idx + 1) % yoga_assets.asanas.asanas.len();
+        set_pose(yoga_assets, bones, asana_text);
     } else if keyboard_input.just_pressed(KeyCode::Down) {
-        if yoga_assets.current_idx == 0 {
-            yoga_assets.current_idx = yoga_assets.asanas.asanas.len() - 1;
-        } else {
-            yoga_assets.current_idx -= 1;
-        }
+        let length = yoga_assets.asanas.asanas.len();
+        yoga_assets.current_idx = (yoga_assets.current_idx + length - 1) % length;
+        set_pose(yoga_assets, bones, asana_text);
     }
-    set_pose(yoga_assets, bones, asana_text);
 }
 
 fn deserialize_db() -> AsanaData {

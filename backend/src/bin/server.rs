@@ -1,3 +1,4 @@
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{
     cookie::{self, Key},
@@ -25,7 +26,7 @@ async fn main() -> std::io::Result<()> {
     let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
 
     let redirect_uri = format!(
-        "http://{}:{}/oauth-redirect",
+        "https://{}:{}/oauth-redirect",
         configuration.application.oauth_redirect_host, configuration.application.port
     );
 
@@ -47,6 +48,16 @@ async fn main() -> std::io::Result<()> {
         oauth_redirect_host: configuration.application.oauth_redirect_host,
     });
 
+    let bind_address = (configuration.application.host, configuration.application.port.parse::<u16>().unwrap());
+
+    println!("serving yogamat backend at https://{}:{}", bind_address.0, bind_address.1);
+
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+    builder
+        .set_private_key_file("matt.test.key", SslFiletype::PEM)
+        .unwrap();
+    builder.set_certificate_chain_file("matt.test.crt").unwrap();
+
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
@@ -60,7 +71,8 @@ async fn main() -> std::io::Result<()> {
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
                     // If the cookie is set as secure, it will only be transmitted when the connection is secure
                     // (using `https`).
-                    .cookie_secure(false)
+                    // .cookie_secure(false)
+                    // the default is true
                     .session_lifecycle(
                         PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
                     )
@@ -69,7 +81,7 @@ async fn main() -> std::io::Result<()> {
                     .build(),
             )
     })
-    .bind((configuration.application.host, configuration.application.port.parse::<u16>().unwrap()))?
+    .bind_openssl(bind_address, builder)?
     .run()
     .await
 }
