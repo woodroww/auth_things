@@ -1,2 +1,4 @@
 .env
 /target
+matt.test.crt
+matt.test.key
