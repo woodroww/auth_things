@@ -3,14 +3,16 @@ services:
     build: backend
     ports:
       - 3000:3000
-  yoga:
-    build: yogamat
     volumes:
-      - www:/usr/share/yogamat
-        #web:
-        #build: frontend
-        #volumes:
-        #- www:/frontend/yewapp/dist
+      - www:/app/dist
+    environment:
+      - APP_APPLICATION__CLIENT_ID
+      - APP_APPLICATION__CLIENT_SECRET
+
+  yoga:
+    build: frontend
+    volumes:
+      - www:/frontend/dist
 volumes:
   www: 
 

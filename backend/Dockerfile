@@ -25,5 +25,7 @@ RUN apt-get update -y \
 	&& rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/server server
 COPY configuration configuration
+COPY matt.test.crt matt.test.crt
+COPY matt.test.key matt.test.key
 ENV APP_ENVIRONMENT aquiles
 ENTRYPOINT ["./server"]
