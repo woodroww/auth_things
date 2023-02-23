@@ -6,7 +6,7 @@ region: nyc3
 services:
   - name: yogamat
     # Relative to the repository root
-    dockerfile_path: ./backend/Dockerfile
+    dockerfile_path: docker-compose.yaml
     source_dir: .
     github:
       # Depending on when you created the repository,

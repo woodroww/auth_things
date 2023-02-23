@@ -4,11 +4,15 @@ services:
     ports:
       - 3000:3000
     volumes:
-      - www:/app/yogamat
+      - www:/app/dist
+    environment:
+      - APP_APPLICATION__CLIENT_ID
+      - APP_APPLICATION__CLIENT_SECRET
+
   yoga:
-    build: yogamat
+    build: frontend
     volumes:
-      - www:/app/webapp
+      - www:/frontend/dist
 volumes:
   www: 
 
