@@ -1,19 +1,35 @@
+
+#--- yew
+
+FROM rust:latest as yew
+RUN apt-get update
+RUN apt-get install -y iputils-ping
+RUN apt-get install -y vim
+RUN cargo install --locked trunk
+RUN rustup target add wasm32-unknown-unknown
+COPY frontend frontend
+WORKDIR frontend
+RUN trunk build index.html
+COPY ./dist ../backend/dist
+
+#--- backend
+
 # https://github.com/LukeMathWalker/cargo-chef
-FROM rust:1 AS chef
+FROM rust:latest AS chef
 RUN cargo install cargo-chef
-WORKDIR app
+COPY backend backend
 
 FROM chef AS planner
-COPY . .
+WORKDIR backend
 # compute a lock-like file for our project
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
-COPY --from=planner /app/recipe.json recipe.json
+COPY --from=planner backend/recipe.json recipe.json
 # build our project dependencies - this is the caching Docker layer
 RUN cargo chef cook --release --recipe-path recipe.json
 # build application
-COPY . .
+# COPY . .
 RUN cargo build --release --bin server
 
 FROM debian:buster-slim AS runtime
@@ -23,9 +39,8 @@ RUN apt-get update -y \
 	&& apt-get autoremove -y \
 	&& apt-get clean -y \
 	&& rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/server server
-COPY configuration configuration
-COPY matt.test.crt matt.test.crt
-COPY matt.test.key matt.test.key
+COPY --from=builder /backend/target/release/server server
+COPY backend/configuration configuration
 ENV APP_ENVIRONMENT production
 ENTRYPOINT ["./server"]
+
