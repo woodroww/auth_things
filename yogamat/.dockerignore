@@ -1,8 +1,0 @@
-.env
-.git/
-.github/
-target/
-tests/
-Dockerfile
-scripts/
-migrations/

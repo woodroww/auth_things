@@ -1,0 +1,36 @@
+#! spec.yaml - configuration file to create/manage DigitalOcean application
+name: portfolio 
+# https://www.digitalocean.com/docs/app-platform/#regional-availability
+# https://www.digitalocean.com/docs/platform/availability-matrix/
+region: nyc3
+services:
+  - name: portfolio
+    # Relative to the repository root
+    dockerfile_path: Dockerfile
+    source_dir: .
+    github:
+      # Depending on when you created the repository,
+      # the default branch on GitHub might have been named `master`
+      branch: main
+      # Deploy a new version on every commit to `main`!
+      # Continuous Deployment, here we come!
+      deploy_on_push: true
+      # !!! Fill in with your details
+      repo: woodroww/
+    # Active probe used by DigitalOcean's to ensure our application is healthy
+    health_check:
+      http_path: /health_check
+    # The port the application will be listening on for incoming requests
+    # It should match what we specified in our configuration/production.yaml file!
+    http_port: 3000
+    # For production workloads we'd go for at least two!
+    # But let's try to keep the bill under control for now...
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    # All incoming requests should be routed to our app
+    routes:
+      - path: /
+    envs:
+      - key: APP_APPLICATION__BASE_URL
+        scope: RUN_TIME
+        value: ${APP_URL}

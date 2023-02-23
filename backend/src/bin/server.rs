@@ -1,4 +1,6 @@
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+
+use actix_web_lab::web::spa;
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{
     cookie::{self, Key},
@@ -66,6 +68,13 @@ async fn main() -> std::io::Result<()> {
             .route("/logout", web::get().to(backend::routes::oauth::logout))
             .route("/health_check", web::get().to(backend::routes::health_check))
             .route("/poses", web::get().to(backend::routes::poses::look_at_poses))
+            .service(
+                spa()
+                .index_file("./dist/index.html")
+                .static_resources_mount("/")
+                .static_resources_location("./dist")
+                .finish()
+            )
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))

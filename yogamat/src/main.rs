@@ -173,7 +173,7 @@ fn ui_example_system(
         .resizable(true)
         .show(egui_context.ctx_mut(), |ui| {
             ui.vertical(|ui| {
-                if ui.checkbox(&mut yoga_assets.check_sanskrit, "Use sanskrit").clicked() {
+                if ui.checkbox(&mut yoga_assets.check_sanskrit, "Search in Sanskrit").clicked() {
                     yoga_assets.search();
                 };
                 let edit = egui::TextEdit::singleline(&mut yoga_assets.asana_name_entry);

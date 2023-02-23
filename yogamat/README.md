@@ -22,13 +22,3 @@ In the webapp dir:
 ```bash
 wasm-opt -Oz -o yoga_matt_bg.wasm yoga_matt_bg.wasm
 ```
-
-## build and run docker
-```bash
-sudo docker build --tag yoga_front .
-sudo docker run -d yoga_front
-sudo docker exec -it container_id /bin/bash
-
-sudo docker-compose up
-```
-
