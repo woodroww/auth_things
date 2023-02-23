@@ -1,4 +1,4 @@
-#--- yew
+# --- yew
 
 FROM rust:latest as yew
 RUN apt-get update
@@ -9,9 +9,8 @@ RUN rustup target add wasm32-unknown-unknown
 COPY frontend frontend
 WORKDIR frontend
 RUN trunk build index.html
-COPY ./dist ../backend/dist
 
-#--- backend
+# --- backend
 
 # https://github.com/LukeMathWalker/cargo-chef
 FROM rust:latest AS chef
@@ -39,7 +38,7 @@ RUN apt-get update -y \
 	&& apt-get clean -y \
 	&& rm -rf /var/lib/apt/lists/*
 COPY --from=builder /backend/target/release/server server
+COPY --from=yew /frontend/dist dist
 COPY backend/configuration configuration
 ENV APP_ENVIRONMENT production
 ENTRYPOINT ["./server"]
-
