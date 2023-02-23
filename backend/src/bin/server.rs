@@ -24,18 +24,24 @@ async fn main() -> std::io::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
-    let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
-    let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
+    //let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
+    //let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
 
+    let google_uri = String::from("https://accounts.google.com/o/oauth2/v2/auth");
+    let token_endpoint = String::from("https://oauth2.googleapis.com/token");
+    let redirect_uri = String::from("https://baeuerlin.net/oauth-redirect");
+
+    /*
     let redirect_uri = format!(
         "https://{}:{}/oauth-redirect",
         configuration.application.oauth_redirect_host, configuration.application.port
     );
+    */
 
     let client = BasicClient::new(
         ClientId::new(configuration.application.client_id.clone()),
         Some(ClientSecret::new(configuration.application.client_secret.clone())),
-        AuthUrl::new(fusion_uri).unwrap(),
+        AuthUrl::new(google_uri).unwrap(),
         Some(TokenUrl::new(token_endpoint).unwrap()),
     )
     .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
