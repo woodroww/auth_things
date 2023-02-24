@@ -13,17 +13,18 @@ use oauth2::{
 
 use backend::configuration::{get_configuration, YogaAppData};
 use secrecy::Secret;
-use tracing_actix_web::{TracingLogger, log};
+use tracing_actix_web::TracingLogger;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let configuration = get_configuration().expect("Failed to read configuration.");
-    tracing::info!("got config");
+    println!("hello");
 
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+    tracing::info!("got config");
 
     //let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
     //let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
