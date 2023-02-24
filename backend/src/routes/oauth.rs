@@ -25,11 +25,11 @@ pub async fn hello(
         .oauth_client
         .authorize_url(CsrfToken::new_random)
         // Set the desired scopes.
-        .add_scope(Scope::new("read".to_string()))
-        .add_scope(Scope::new("write".to_string()))
+        //.add_scope(Scope::new("read".to_string()))
+        //.add_scope(Scope::new("write".to_string()))
         .add_scope(Scope::new("openid".to_string()))
         .add_scope(Scope::new("profile".to_string()))
-        .add_scope(Scope::new("offline_access".to_string())) // refresh tokens
+        //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
         // Set the PKCE code challenge.
         .set_pkce_challenge(pkce_challenge)
         .url();
