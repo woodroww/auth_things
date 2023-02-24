@@ -13,11 +13,12 @@ use oauth2::{
 
 use backend::configuration::{get_configuration, YogaAppData};
 use secrecy::Secret;
-use tracing_actix_web::TracingLogger;
+use tracing_actix_web::{TracingLogger, log};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let configuration = get_configuration().expect("Failed to read configuration.");
+    tracing::info!("got config");
 
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::INFO)
@@ -46,6 +47,8 @@ async fn main() -> std::io::Result<()> {
     )
     .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
 
+    tracing::info!("BasicClient setup");
+
     let yoga_data = web::Data::new(YogaAppData {
         oauth_client: client,
         host: configuration.application.host.clone(),
@@ -58,13 +61,15 @@ async fn main() -> std::io::Result<()> {
 
     let bind_address = (configuration.application.host, configuration.application.port.parse::<u16>().unwrap());
 
-    println!("serving yogamat backend at https://{}:{}", bind_address.0, bind_address.1);
+    tracing::info!("serving yogamat backend at https://{}:{}", bind_address.0, bind_address.1);
 
+    /*
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
     builder
         .set_private_key_file("matt.test.key", SslFiletype::PEM)
         .unwrap();
     builder.set_certificate_chain_file("matt.test.crt").unwrap();
+    */
 
     HttpServer::new(move || {
         App::new()
@@ -96,7 +101,8 @@ async fn main() -> std::io::Result<()> {
                     .build(),
             )
     })
-    .bind_openssl(bind_address, builder)?
+    //.bind_openssl(bind_address, builder)?
+    .bind(bind_address)?
     .run()
     .await
 }

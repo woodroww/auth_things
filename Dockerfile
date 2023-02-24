@@ -15,9 +15,9 @@ RUN trunk build index.html
 # https://github.com/LukeMathWalker/cargo-chef
 FROM rust:latest AS chef
 RUN cargo install cargo-chef
-COPY backend backend
 
 FROM chef AS planner
+COPY backend backend
 WORKDIR backend
 # compute a lock-like file for our project
 RUN cargo chef prepare --recipe-path recipe.json
@@ -27,7 +27,6 @@ COPY --from=planner backend/recipe.json recipe.json
 # build our project dependencies - this is the caching Docker layer
 RUN cargo chef cook --release --recipe-path recipe.json
 # build application
-# COPY . .
 RUN cargo build --release --bin server
 
 FROM debian:buster-slim AS runtime
