@@ -40,6 +40,11 @@ async fn main() -> std::io::Result<()> {
     );
     */
 
+    let client_id = configuration.application.client_id.clone();
+    let secret = configuration.application.client_secret.clone();
+    tracing::info!("client_id len {}", client_id.len());
+    tracing::info!("secret len {}", secret.len());
+
     let client = BasicClient::new(
         ClientId::new(configuration.application.client_id.clone()),
         Some(ClientSecret::new(configuration.application.client_secret.clone())),
