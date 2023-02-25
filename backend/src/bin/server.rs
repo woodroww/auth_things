@@ -6,7 +6,7 @@ use actix_web::{
     cookie::{self, Key},
     web, App, HttpServer,
 };
-use oauth2::basic::BasicClient;
+use oauth2::{basic::BasicClient, RevocationUrl};
 use oauth2::{
     AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl,
 };
@@ -28,7 +28,9 @@ async fn main() -> std::io::Result<()> {
     //let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
 
     let google_uri = String::from("https://accounts.google.com/o/oauth2/v2/auth");
-    let token_endpoint = String::from("https://oauth2.googleapis.com/token");
+    let token_uri = String::from("https://oauth2.googleapis.com/token");
+    let revoke_uri = String::from("https://oauth2.googleapis.com/revoke");
+
     let redirect_uri = String::from("https://baeuerlin.net/oauth-redirect");
 
     /*
@@ -42,9 +44,10 @@ async fn main() -> std::io::Result<()> {
         ClientId::new(configuration.application.client_id.clone()),
         Some(ClientSecret::new(configuration.application.client_secret.clone())),
         AuthUrl::new(google_uri).unwrap(),
-        Some(TokenUrl::new(token_endpoint).unwrap()),
+        Some(TokenUrl::new(token_uri).unwrap()),
     )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
+    .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap())
+    .set_revocation_uri(RevocationUrl::new(revoke_uri).unwrap());
 
     let yoga_data = web::Data::new(YogaAppData {
         oauth_client: client,

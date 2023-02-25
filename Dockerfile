@@ -1,5 +1,3 @@
-# --- yew
-
 FROM rust:latest as builder
 RUN apt-get update
 RUN apt-get install -y iputils-ping
@@ -15,16 +13,15 @@ WORKDIR backend
 RUN cargo build --release --bin server
 
 FROM debian:buster-slim AS runtime
-WORKDIR app
+WORKDIR /
 RUN apt-get update -y \
 	&& apt-get install -y --no-install-recommends openssl ca-certificates \
 	&& apt-get autoremove -y \
 	&& apt-get clean -y \
 	&& rm -rf /var/lib/apt/lists/*
-COPY --from=builder backend/target/release/server server
-COPY --from=builder frontend/dist dist
-COPY backend/configuration configuration
+COPY --from=builder backend/target/release/server ./app/server
+COPY --from=builder frontend/dist ./app/dist
+COPY configuration configuration
 ENV APP_ENVIRONMENT aquiles
-ENTRYPOINT ["./server"]
+ENTRYPOINT ["./app/server"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]
-

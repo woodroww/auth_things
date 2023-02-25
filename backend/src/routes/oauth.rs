@@ -4,7 +4,7 @@ use actix_web::{http::header::ContentType, web, HttpResponse, cookie::{
     time::{Duration, OffsetDateTime},
     Cookie, SameSite,
 }};
-use oauth2::basic::BasicTokenType;
+use oauth2::{basic::BasicTokenType, StandardRevocableToken};
 use oauth2::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, TokenResponse};
 
@@ -60,15 +60,25 @@ pub async fn logout(
     session: TypedSession,
     app_data: web::Data<YogaAppData>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    let token = session.get_access_token()?;
     session.purge();
-    let logout_endpoint = format!(
-        "http://{}/oauth2/logout?client_id={}",
-        app_data.oauth_server,
-        app_data.client_id.expose_secret()
-    );
+
+    if let Some(token) = token {
+        /*
+        let revoke_token: StandardRevocableToken = match token.refresh_token() {
+            Some(token) => token.into(),
+            None => token.access_token().into(),
+        };*/
+
+        app_data.oauth_client
+            .revoke_token(/*revoke_token*/token.into())
+            .unwrap()
+            .request(oauth2::reqwest::http_client)
+            .expect("Failed to revoke token");
+    }
 
     Ok(HttpResponse::SeeOther()
-        .insert_header((actix_web::http::header::LOCATION, logout_endpoint))
+        .insert_header((actix_web::http::header::LOCATION, "https://baeuerlin.net"))
         .finish())
 }
 
@@ -100,9 +110,6 @@ pub async fn receive_token(
         }
         Err(_) => tracing::info!("json un parsed"),
     }
-
-
-
     // JWT header
     //let header: Header = decode_header(&jwt).unwrap();
     //let kid = header.kid.clone().unwrap();
@@ -219,50 +226,3 @@ pub async fn oauth_login_redirect(
 }
 
 
-
-    /*
-        reqwest::Client::new()
-            .get(&logout_endpoint)
-            .send()
-            .await.unwrap()
-
-        let status = response.status();
-        let response_text = response.text().await.unwrap();
-        if status.is_success() {
-            println!("success token response body {}", response_text);
-        } else {
-            println!("status: {}\n{}", status, response_text);
-        }
-
-        Ok(HttpResponse::Ok()
-            .content_type(ContentType::html())
-            .body(format!(
-                r#"<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta http-equiv="content-type" content="text/html; charset=utf-8">
-        <title>Logged Out</title>
-    </head>
-    <body>
-    <p>You have been logged out.</p>
-    <p>Bye.</p>
-    </body>
-    </html>"#
-            )))
-            */
-/*
-fn revoke_token() {
-    // Revoke the obtained token
-    let token_response = token_response.unwrap();
-    let token_to_revoke: StandardRevocableToken = match token_response.refresh_token() {
-        Some(token) => token.into(),
-        None => token_response.access_token().into(),
-    };
-
-    client
-        .revoke_token(token_to_revoke)
-        .unwrap()
-        .request(http_client)
-        .expect("Failed to revoke token");
-}
-    */

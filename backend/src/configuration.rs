@@ -36,7 +36,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     // dir in which the app is started
     let base_path = std::env::current_dir().expect("Failed to determine the current directory");
     // (we must start where the config folder is located)
-    let configuration_directory = base_path.join("configuration");
+    let configuration_directory = base_path.join("../configuration");
     // APP_ENVIRONMENT is set in Dockerfile or local env
     // - 'ENV APP_ENVIRONMENT production' to make a production environment
     // - 'ENV APP_ENVIRONMENT local' to make a local developement environment
