@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-const URL: &str = std::env!("URL");
+const URL: &str = std::env!("APP_URL");
 
 #[function_component]
 pub fn Login() -> Html {
