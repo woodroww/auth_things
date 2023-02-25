@@ -11,6 +11,7 @@ pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
+    tracing::info!("request_login_uri");
     // OAuth flow
     // 2. The client (this app) redirects browser to the authorization server.
     // Through the Login link leading to auth_url.
@@ -94,12 +95,14 @@ pub async fn receive_token(
         }
     }
 
+    /*
     let logout_uri = format!(
         "http://{}:{}/logout",
         app_data.oauth_redirect_host, app_data.port
     );
+    */
     // yew path
-    let after_login_url = format!("0.0.0.0:3000/login-success");
+    let after_login_url = format!("https://baeuerlin.net/login-success");
 
     Ok(HttpResponse::Found()
         .append_header((actix_web::http::header::LOCATION, after_login_url))
