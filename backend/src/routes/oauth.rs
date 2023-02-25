@@ -128,7 +128,7 @@ pub async fn receive_token(
     token: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
-    println!("matts fun token:\n{:#?}", token);
+    tracing::info!("matts fun token:\n{:#?}", token);
 
     // The access token issued by the authorization server.
     let jwt = token.access_token();
@@ -143,8 +143,13 @@ pub async fn receive_token(
     // nonce can be verified if I knew how to send on, it is for openid
 
     match token.refresh_token() {
-        Some(refresh) => session.set_refresh_token(refresh.clone())?,
-        None => {}
+        Some(refresh) => {
+            session.set_refresh_token(refresh.clone())?,
+            tracing::info!("got a refresh token", token);
+        }
+        None => {
+            tracing::info!("didn't got a refresh token", token);
+        }
     }
 
     let logout_uri = format!(
@@ -174,6 +179,7 @@ pub async fn oauth_login_redirect(
     login: web::Query<LoginRedirect>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
+    tracing::info!("oauth_login_redirect");
     // OAuth flow
     // 5. The authorization server redirects back to the client using the redirect uri. Along with
     //    a temporary authorization code.
@@ -198,6 +204,7 @@ pub async fn oauth_login_redirect(
             return Ok(response);
         }
 
+        tracing::info!("States match, yeah!");
         // OAuth flow
         // 6. The client then contacts the authorization server directly (not using the resource
         //    owners browser). Securely sends its client id, client secret, authorization code,
@@ -213,6 +220,8 @@ pub async fn oauth_login_redirect(
         if let Ok(token) = token_response {
             // this is the happy path
             return receive_token(app_data, token, session).await;
+        } else {
+            tracing::info!("did not exchage code for token_response");
         }
     } else {
         tracing::info!("there is no session state or no verifier");

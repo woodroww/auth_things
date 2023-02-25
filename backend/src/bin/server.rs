@@ -31,7 +31,7 @@ async fn main() -> std::io::Result<()> {
 
     let google_uri = String::from("https://accounts.google.com/o/oauth2/v2/auth");
     let token_endpoint = String::from("https://oauth2.googleapis.com/token");
-    let redirect_uri = String::from("https://baeuerlin.net:3000/oauth-redirect");
+    let redirect_uri = String::from("https://baeuerlin.net/oauth-redirect");
 
     /*
     let redirect_uri = format!(
