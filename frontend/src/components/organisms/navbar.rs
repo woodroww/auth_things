@@ -59,6 +59,7 @@ pub fn Navbar() -> Html {
             <nav class="header">
                 <BBLink text="Home" route={Route::Home} />
                 <BBLink text="Portfolio" route={Route::Portfolio} />
+                <BBLink text="Login" route={Route::Login} />
                 <BBButton onclick={switch_theme} label={theme_str} />
             </nav>
         </div>

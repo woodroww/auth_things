@@ -7,7 +7,7 @@ use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, Tok
 
 use secrecy::ExposeSecret;
 
-pub async fn hello(
+pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -38,21 +38,9 @@ pub async fn hello(
     session.set_state(csrf_token)?;
 
     // The web page the user sees with the link to the authorization server
-    Ok(HttpResponse::Ok()
-        .content_type(ContentType::html())
-        .body(format!(
-            r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta http-equiv="content-type" content="text/html; charset=utf-8">
-    <title>Login</title>
-</head>
-<body>
-Hello world! <a href={}>Login</a>
-</body>
-</html>"#,
-            auth_url
-        )))
+    Ok(HttpResponse::Found()
+        .append_header((actix_web::http::header::LOCATION, Into::<String>::into(auth_url)))
+        .body(""))
 }
 
 #[derive(serde::Deserialize)]
@@ -75,53 +63,7 @@ pub async fn logout(
     Ok(HttpResponse::SeeOther()
         .insert_header((actix_web::http::header::LOCATION, logout_endpoint))
         .finish())
-    /*
-        reqwest::Client::new()
-            .get(&logout_endpoint)
-            .send()
-            .await.unwrap()
-
-        let status = response.status();
-        let response_text = response.text().await.unwrap();
-        if status.is_success() {
-            println!("success token response body {}", response_text);
-        } else {
-            println!("status: {}\n{}", status, response_text);
-        }
-
-        Ok(HttpResponse::Ok()
-            .content_type(ContentType::html())
-            .body(format!(
-                r#"<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta http-equiv="content-type" content="text/html; charset=utf-8">
-        <title>Logged Out</title>
-    </head>
-    <body>
-    <p>You have been logged out.</p>
-    <p>Bye.</p>
-    </body>
-    </html>"#
-            )))
-            */
 }
-/*
-fn revoke_token() {
-    // Revoke the obtained token
-    let token_response = token_response.unwrap();
-    let token_to_revoke: StandardRevocableToken = match token_response.refresh_token() {
-        Some(token) => token.into(),
-        None => token_response.access_token().into(),
-    };
-
-    client
-        .revoke_token(token_to_revoke)
-        .unwrap()
-        .request(http_client)
-        .expect("Failed to revoke token");
-}
-    */
 
 pub async fn receive_token(
     app_data: web::Data<YogaAppData>,
@@ -156,22 +98,13 @@ pub async fn receive_token(
         "http://{}:{}/logout",
         app_data.oauth_redirect_host, app_data.port
     );
-    Ok(HttpResponse::Ok()
+    // yew path
+    let after_login_url = format!("0.0.0.0:3000/login-success");
+
+    Ok(HttpResponse::Found()
+        .append_header((actix_web::http::header::LOCATION, after_login_url))
         .content_type(ContentType::html())
-        .body(format!(
-            r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta http-equiv="content-type" content="text/html; charset=utf-8">
-    <title>Logged In</title>
-</head>
-<body>
-<p>You have been logged in.</p>
-<a href={}>Logout</a>
-</body>
-</html>"#,
-            logout_uri,
-        )))
+        .body("You have been logged in."))
 }
 
 pub async fn oauth_login_redirect(
@@ -243,3 +176,52 @@ pub async fn oauth_login_redirect(
 </html>"#,
         )))
 }
+
+
+
+    /*
+        reqwest::Client::new()
+            .get(&logout_endpoint)
+            .send()
+            .await.unwrap()
+
+        let status = response.status();
+        let response_text = response.text().await.unwrap();
+        if status.is_success() {
+            println!("success token response body {}", response_text);
+        } else {
+            println!("status: {}\n{}", status, response_text);
+        }
+
+        Ok(HttpResponse::Ok()
+            .content_type(ContentType::html())
+            .body(format!(
+                r#"<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+        <title>Logged Out</title>
+    </head>
+    <body>
+    <p>You have been logged out.</p>
+    <p>Bye.</p>
+    </body>
+    </html>"#
+            )))
+            */
+/*
+fn revoke_token() {
+    // Revoke the obtained token
+    let token_response = token_response.unwrap();
+    let token_to_revoke: StandardRevocableToken = match token_response.refresh_token() {
+        Some(token) => token.into(),
+        None => token_response.access_token().into(),
+    };
+
+    client
+        .revoke_token(token_to_revoke)
+        .unwrap()
+        .request(http_client)
+        .expect("Failed to revoke token");
+}
+    */

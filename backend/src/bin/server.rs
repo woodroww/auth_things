@@ -18,13 +18,11 @@ use tracing_actix_web::TracingLogger;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let configuration = get_configuration().expect("Failed to read configuration.");
-    println!("hello");
 
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
-    tracing::info!("got config");
 
     //let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
     //let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
@@ -42,8 +40,6 @@ async fn main() -> std::io::Result<()> {
 
     let client_id = configuration.application.client_id.clone();
     let secret = configuration.application.client_secret.clone();
-    tracing::info!("client_id len {}", client_id.len());
-    tracing::info!("secret len {}", secret.len());
 
     let client = BasicClient::new(
         ClientId::new(configuration.application.client_id.clone()),
@@ -52,8 +48,6 @@ async fn main() -> std::io::Result<()> {
         Some(TokenUrl::new(token_endpoint).unwrap()),
     )
     .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
-
-    tracing::info!("BasicClient setup");
 
     let yoga_data = web::Data::new(YogaAppData {
         oauth_client: client,
@@ -80,7 +74,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            .route("/login", web::get().to(backend::routes::oauth::hello))
+            .route("/client-login", web::get().to(backend::routes::oauth::request_login_uri))
             .route("/oauth-redirect", web::get().to(backend::routes::oauth::oauth_login_redirect))
             .route("/logout", web::get().to(backend::routes::oauth::logout))
             .route("/health_check", web::get().to(backend::routes::health_check))
