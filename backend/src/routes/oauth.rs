@@ -1,11 +1,15 @@
 use crate::configuration::YogaAppData;
 use crate::session_state::TypedSession;
-use actix_web::{http::header::ContentType, web, HttpResponse};
+use actix_web::{http::header::ContentType, web, HttpResponse, cookie::{
+    time::{Duration, OffsetDateTime},
+    Cookie, SameSite,
+}};
 use oauth2::basic::BasicTokenType;
 use oauth2::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, TokenResponse};
 
 use secrecy::ExposeSecret;
+use serde_json::Value;
 
 pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
@@ -22,12 +26,14 @@ pub async fn request_login_uri(
     session.set_pkce_verifier(pkce_verifier)?;
 
     // Generate the full authorization URL.
+    // cross site request forgery token
     let (auth_url, csrf_token) = app_data
         .oauth_client
         .authorize_url(CsrfToken::new_random)
         // Set the desired scopes.
         //.add_scope(Scope::new("read".to_string()))
         //.add_scope(Scope::new("write".to_string()))
+        //.add_scope(Scope::new("email".to_string()))
         .add_scope(Scope::new("openid".to_string()))
         .add_scope(Scope::new("profile".to_string()))
         //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
@@ -67,15 +73,35 @@ pub async fn logout(
 }
 
 pub async fn receive_token(
-    app_data: web::Data<YogaAppData>,
+    _app_data: web::Data<YogaAppData>,
     token: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
-    tracing::info!("matts fun token:\n{:#?}", token);
+    // oauth flow
+    // 8. The client doesn't understand the token but can use it to send requests to the resource server
+    // tracing::info!("matts fun token:\n{:#?}", token);
 
     // The access token issued by the authorization server.
     let jwt = token.access_token();
     session.set_access_token(jwt.clone())?;
+
+    let jambones = jwt.secret().clone();
+    match serde_json::from_str(&jambones) {
+        Ok(value) => {
+            tracing::info!("json OK");
+            match value {
+                Value::Null => tracing::info!("Null"),
+                Value::Bool(_) => tracing::info!("Bool"),
+                Value::Number(_) => tracing::info!("Number"),
+                Value::String(_) => tracing::info!("String"),
+                Value::Array(_) => tracing::info!("Array"),
+                Value::Object(_) => tracing::info!("Object"),
+            }
+        }
+        Err(_) => tracing::info!("json un parsed"),
+    }
+
+
 
     // JWT header
     //let header: Header = decode_header(&jwt).unwrap();
@@ -95,6 +121,12 @@ pub async fn receive_token(
         }
     }
 
+    if let Some(scopes) = token.scopes() {
+        for scope in scopes {
+            tracing::info!("scope: {:?}", scope);
+        }
+    }
+
     /*
     let logout_uri = format!(
         "http://{}:{}/logout",
@@ -103,11 +135,17 @@ pub async fn receive_token(
     */
     // yew path
     let after_login_url = format!("https://baeuerlin.net/login-success");
+    let cookie = Cookie::build("email", "pretend_email")
+        .path("/")
+        .same_site(SameSite::Lax)
+        .expires(OffsetDateTime::now_utc().checked_add(Duration::minutes(60)))
+        .finish();
 
     Ok(HttpResponse::Found()
         .append_header((actix_web::http::header::LOCATION, after_login_url))
         .content_type(ContentType::html())
-        .body("You have been logged in."))
+        .cookie(cookie)
+        .finish())
 }
 
 pub async fn oauth_login_redirect(

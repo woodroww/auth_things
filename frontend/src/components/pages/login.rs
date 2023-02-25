@@ -11,7 +11,7 @@ pub fn Login() -> Html {
             .set_href("localhost/client-login")
             .ok();
     });*/
-    let login_url = "https://baeuerlin.net:3000/client-login";
+    let login_url = "https://baeuerlin.net/client-login";
     gloo_console::log!("the login url: {}", login_url);
     html! {
         <>
