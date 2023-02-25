@@ -144,11 +144,11 @@ pub async fn receive_token(
 
     match token.refresh_token() {
         Some(refresh) => {
-            session.set_refresh_token(refresh.clone())?,
-            tracing::info!("got a refresh token", token);
+            session.set_refresh_token(refresh.clone())?;
+            tracing::info!("got a refresh token");
         }
         None => {
-            tracing::info!("didn't got a refresh token", token);
+            tracing::info!("didn't got a refresh token");
         }
     }
 
