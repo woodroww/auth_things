@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-const URL: &str = std::env!("APP_URL");
+//const URL: &str = std::env!("APP_URL");
 
 #[function_component]
 pub fn Login() -> Html {
@@ -11,8 +11,8 @@ pub fn Login() -> Html {
             .set_href("localhost/client-login")
             .ok();
     });*/
-    let login_url = format!("{}/client-login", URL);
-    gloo_console::log!("the login url: {}", &login_url);
+    let login_url = "https://baeuerlin.net:3000/client-login";
+    gloo_console::log!("the login url: {}", login_url);
     html! {
         <>
             <h1>{"Login Page"}</h1>
