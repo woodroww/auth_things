@@ -5,7 +5,6 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 use components::organisms::navbar::Navbar;
 use router::{switch, Route};
-use common::configuration::get_configuration;
 use contexts::{use_theme, ThemeKind, ThemeProvider};
 use frontend::AppData;
 
