@@ -8,6 +8,7 @@ COPY frontend frontend
 WORKDIR frontend
 RUN trunk build index.html
 WORKDIR /
+COPY common common
 COPY backend backend
 WORKDIR backend
 RUN cargo build --release --bin server
