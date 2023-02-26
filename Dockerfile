@@ -22,6 +22,7 @@ RUN apt-get update -y \
 COPY --from=builder backend/target/release/server ./app/server
 COPY --from=builder frontend/dist ./app/dist
 COPY configuration configuration
-ENV APP_ENVIRONMENT aquiles
-ENTRYPOINT ["./app/server"]
+ENV APP_ENVIRONMENT production
+WORKDIR app
+ENTRYPOINT ["./server"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]

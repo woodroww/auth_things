@@ -11,6 +11,7 @@ use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, Tok
 use secrecy::ExposeSecret;
 use serde_json::Value;
 
+#[actix_web::get("/client-login")]
 pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
@@ -33,8 +34,11 @@ pub async fn request_login_uri(
         // Set the desired scopes.
         //.add_scope(Scope::new("read".to_string()))
         //.add_scope(Scope::new("write".to_string()))
+        // maybe google
         //.add_scope(Scope::new("email".to_string()))
+        // google 1 of 2
         .add_scope(Scope::new("openid".to_string()))
+        // google 2 of 2
         .add_scope(Scope::new("profile".to_string()))
         //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
         // Set the PKCE code challenge.
@@ -48,12 +52,6 @@ pub async fn request_login_uri(
     Ok(HttpResponse::Found()
         .append_header((actix_web::http::header::LOCATION, Into::<String>::into(auth_url)))
         .body(""))
-}
-
-#[derive(serde::Deserialize)]
-pub struct LoginRedirect {
-    code: String,
-    state: String,
 }
 
 pub async fn logout(
@@ -141,7 +139,10 @@ pub async fn receive_token(
     );
     */
     // yew path
-    let after_login_url = format!("https://baeuerlin.net/login-success");
+    //let after_login_url = format!("https://baeuerlin.net/login-success");
+
+    let after_login_url = format!("http://matts-imac.local/login-success");
+
     let cookie = Cookie::build("email", "pretend_email")
         .path("/")
         .same_site(SameSite::Lax)
@@ -155,6 +156,19 @@ pub async fn receive_token(
         .finish())
 }
 
+#[derive(serde::Deserialize)]
+pub struct LoginRedirect {
+    code: String,
+    state: String,
+}
+
+// http://matts-imac.local:3000/oauth-redirect?
+// code=kvJr7Yq14vLS6dDAWqrLME0twYc2wEA4XlqQf4DsIxM
+// locale=en
+// state=zcEnPKPkA-uDSPNCJqXmfw
+// userState=Authenticated
+
+#[actix_web::get("/oauth-redirect")]
 pub async fn oauth_login_redirect(
     app_data: web::Data<YogaAppData>,
     login: web::Query<LoginRedirect>,
@@ -171,6 +185,8 @@ pub async fn oauth_login_redirect(
     // this is echoed back to this application so that we can verify that the code
     // came from the correct location
 
+    let mut error_str = String::new();
+
     if let (Ok(Some(state)), Ok(Some(verifier))) =
         (session.get_state(), session.get_pkce_verifier())
     {
@@ -185,7 +201,6 @@ pub async fn oauth_login_redirect(
             return Ok(response);
         }
 
-        tracing::info!("States match, yeah!");
         // OAuth flow
         // 6. The client then contacts the authorization server directly (not using the resource
         //    owners browser). Securely sends its client id, client secret, authorization code,
@@ -202,10 +217,27 @@ pub async fn oauth_login_redirect(
             // this is the happy path
             return receive_token(app_data, token, session).await;
         } else {
-            tracing::info!("did not exchage code for token_response");
+            error_str.push_str("did not exchage code for token_response")
         }
+
     } else {
-        tracing::info!("there is no session state or no verifier");
+
+        if let Ok(s) = session.get_state() {
+            if let Some(_state) = s {
+            } else {
+                error_str.push_str("get_state Ok() but None, there is no session state")
+            }
+        } else {
+            error_str.push_str("get_state Err(), there is no session state")
+        }
+        if let Ok(v) = session.get_pkce_verifier() {
+            if let Some(_verifier) = v {
+            } else {
+                error_str.push_str("get_pkce_verifier Ok() but None, there is no pkce_verifier")
+            }
+        } else {
+            error_str.push_str("get_pkce_verifier Err(), there is no pkce_verifier")
+        }
     }
 
     // this is going to be the error response
@@ -220,8 +252,9 @@ pub async fn oauth_login_redirect(
 </head>
 <body>
 <p>Something went wrong with OAuth</p>
+<p>{}</p>
 </body>
-</html>"#,
+</html>"#, error_str
         )))
 }
 

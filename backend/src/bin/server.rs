@@ -27,11 +27,12 @@ async fn main() -> std::io::Result<()> {
     //let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
     //let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
 
-    let google_uri = String::from("https://accounts.google.com/o/oauth2/v2/auth");
-    let token_uri = String::from("https://oauth2.googleapis.com/token");
-    let revoke_uri = String::from("https://oauth2.googleapis.com/revoke");
-
+    /*
+    let oauth_url = String::from("https://accounts.google.com/o/oauth2/v2/auth");
+    let token_url = String::from("https://oauth2.googleapis.com/token");
+    let revoke_url = String::from("https://oauth2.googleapis.com/revoke");
     let redirect_uri = String::from("https://baeuerlin.net/oauth-redirect");
+    */
 
     /*
     let redirect_uri = format!(
@@ -43,39 +44,32 @@ async fn main() -> std::io::Result<()> {
     let client = BasicClient::new(
         ClientId::new(configuration.application.client_id.clone()),
         Some(ClientSecret::new(configuration.application.client_secret.clone())),
-        AuthUrl::new(google_uri).unwrap(),
-        Some(TokenUrl::new(token_uri).unwrap()),
+        AuthUrl::new(configuration.application.oauth_url).unwrap(),
+        Some(TokenUrl::new(configuration.application.token_url).unwrap()),
     )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap())
-    .set_revocation_uri(RevocationUrl::new(revoke_uri).unwrap());
+    .set_redirect_uri(RedirectUrl::new(configuration.application.oauth_redirect_url.clone()).unwrap())
+    .set_revocation_uri(RevocationUrl::new(configuration.application.revoke_url).unwrap());
 
     let yoga_data = web::Data::new(YogaAppData {
         oauth_client: client,
         host: configuration.application.host.clone(),
         port: configuration.application.port.clone(),
-        oauth_server: configuration.application.oauth_server,
         client_id: Secret::new(configuration.application.client_id.clone()),
         client_secret: Secret::new(configuration.application.client_secret.clone()),
-        oauth_redirect_host: configuration.application.oauth_redirect_host,
+        oauth_redirect_url: configuration.application.oauth_redirect_url,
     });
 
     let bind_address = (configuration.application.host, configuration.application.port.parse::<u16>().unwrap());
 
     tracing::info!("serving yogamat backend at https://{}:{}", bind_address.0, bind_address.1);
 
-    /*
-    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-    builder
-        .set_private_key_file("matt.test.key", SslFiletype::PEM)
-        .unwrap();
-    builder.set_certificate_chain_file("matt.test.crt").unwrap();
-    */
-
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            .route("/client-login", web::get().to(backend::routes::oauth::request_login_uri))
-            .route("/oauth-redirect", web::get().to(backend::routes::oauth::oauth_login_redirect))
+            //.route("/client-login", web::get().to(backend::routes::oauth::request_login_uri))
+            .service(backend::routes::oauth::request_login_uri)
+            //.route("/oauth-redirect", web::get().to(backend::routes::oauth::oauth_login_redirect))
+            .service(backend::routes::oauth::oauth_login_redirect)
             .route("/logout", web::get().to(backend::routes::oauth::logout))
             .route("/health_check", web::get().to(backend::routes::health_check))
             .route("/poses", web::get().to(backend::routes::poses::look_at_poses))
@@ -89,19 +83,19 @@ async fn main() -> std::io::Result<()> {
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-                    // If the cookie is set as secure, it will only be transmitted when the connection is secure
-                    // (using `https`).
-                    // .cookie_secure(false)
-                    // the default is true
+                    // If the cookie is set as secure, it will only be transmitted when the
+                    // connection is secure (using `https`).
+                    // the default is .cookie_secure(true)
+                    // no javascript access to cookies
+                    // the default is .cookie_http_only(true)
                     .session_lifecycle(
                         PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
                     )
-                    // the default is .cookie_http_only(true)
-                    // the default is .cookie_content_security(CookieContentSecurity::Private) // encrypted but not signed
+                    // Private - encrypted but not signed
+                    // the default is .cookie_content_security(CookieContentSecurity::Private)
                     .build(),
             )
     })
-    //.bind_openssl(bind_address, builder)?
     .bind(bind_address)?
     .run()
     .await

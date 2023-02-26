@@ -11,10 +11,12 @@ use secrecy::Secret;
 pub struct ApplicationSettings {
     pub port: String,
     pub host: String,
-    pub oauth_server: String,
     pub client_secret: String,
     pub client_id: String,
-    pub oauth_redirect_host: String,
+    pub oauth_redirect_url: String,
+    pub oauth_url: String,
+    pub token_url: String,
+    pub revoke_url: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -24,11 +26,10 @@ pub struct Settings {
 
 pub struct YogaAppData {
     pub oauth_client: BasicClient,
-    pub oauth_server: String,
     pub client_id: Secret<String>,
     pub client_secret: Secret<String>,
     pub host: String,
-    pub oauth_redirect_host: String,
+    pub oauth_redirect_url: String,
     pub port: String,
 }
 

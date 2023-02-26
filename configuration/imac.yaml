@@ -1,4 +1,6 @@
 application:
   host: matts-imac.local
-  oauth_redirect_host: matts-imac.local
-  oauth_server: aquiles.local:9011
+  oauth_redirect_url: http://matts-imac.local:3000/oauth-redirect
+  oauth_url: http://aquiles.local:9011/oauth2/authorize
+  token_url: http://aquiles.local:9011/oauth2/token
+  revoke_url: http://aquiles.local:9011/revoke
