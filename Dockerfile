@@ -4,6 +4,7 @@ RUN apt-get install -y iputils-ping
 RUN apt-get install -y vim
 RUN cargo install --locked trunk
 RUN rustup target add wasm32-unknown-unknown
+ENV APP_ENVIRONMENT production
 COPY frontend frontend
 WORKDIR frontend
 RUN trunk build index.html
