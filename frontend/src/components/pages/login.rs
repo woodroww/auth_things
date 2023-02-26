@@ -19,7 +19,7 @@ pub fn Login() -> Html {
         }
     };
     */
-    let login_url = format!("{}/client-login");
+    let login_url = format!("{}/client-login", URL);
     gloo_console::log!("the login url: {}", &login_url);
     html! {
         <>
