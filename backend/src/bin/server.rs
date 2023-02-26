@@ -1,4 +1,4 @@
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+//use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 use actix_web_lab::web::spa;
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
@@ -11,7 +11,8 @@ use oauth2::{
     AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl,
 };
 
-use backend::configuration::{get_configuration, YogaAppData};
+use common::configuration::get_configuration;
+use backend::YogaAppData;
 use secrecy::Secret;
 use tracing_actix_web::TracingLogger;
 

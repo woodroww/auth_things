@@ -22,7 +22,8 @@ serde_json = "1.0.93"
 oauth2 = "4.3.0"
 url = "2.3.1"
 anyhow = "1.0.69"
-config = "0.13.3"
+#config = "0.13.3"
 jsonwebtoken = "8.2.0"
 openssl = "0.10.45"
 actix-web-lab = { version = "0.19.0", features = ["spa"] }
+common = { path = "../common" }

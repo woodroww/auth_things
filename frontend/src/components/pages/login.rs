@@ -2,20 +2,14 @@ use yew::prelude::*;
 use gloo_utils::{window, document};
 use wasm_bindgen::JsCast;
 use web_sys::HtmlDocument;
+use crate::AppData;
 
-const APP_ENVIRONMENT: &str = std::env!("APP_ENVIRONMENT");
+const URL: &str = std::env!("URL");
 
 #[function_component]
 pub fn Login() -> Html {
     /*
-    let login = Callback::from(|_: MouseEvent| {
-        window()
-            .location()
-            .set_href("localhost/client-login")
-            .ok();
-    });*/
-
-    let login_url = match APP_ENVIRONMENT {
+        let login_url = match APP_ENVIRONMENT {
         "production" => "https://baeuerlin.net/client-login",
         "imac" => "http://matts-imac.local:3000/client-login",
         "aquiles" => "http://aquiles.local:3000/client-login",
@@ -24,7 +18,9 @@ pub fn Login() -> Html {
             ""
         }
     };
-    gloo_console::log!("the login url: {}", login_url);
+    */
+    let login_url = format!("{}/client-login");
+    gloo_console::log!("the login url: {}", &login_url);
     html! {
         <>
             <h1>{"Login Page"}</h1>

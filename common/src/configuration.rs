@@ -4,9 +4,6 @@
 // Config lets you set a set of default parameters and then extend them via merging in
 // configuration from a variety of sources
 
-use oauth2::basic::BasicClient;
-use secrecy::Secret;
-
 #[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     pub port: String,
@@ -22,15 +19,6 @@ pub struct ApplicationSettings {
 #[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub application: ApplicationSettings,
-}
-
-pub struct YogaAppData {
-    pub oauth_client: BasicClient,
-    pub client_id: Secret<String>,
-    pub client_secret: Secret<String>,
-    pub host: String,
-    pub oauth_redirect_url: String,
-    pub port: String,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

@@ -1,9 +1,7 @@
-use crate::configuration::YogaAppData;
 use crate::session_state::TypedSession;
 use actix_web::{web, HttpResponse, http::header::ContentType};
 
 pub async fn look_at_poses(
-    _app_data: web::Data<YogaAppData>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
     let authorized = match session.get_access_token() {

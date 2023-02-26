@@ -1,11 +1,13 @@
+use std::rc::Rc;
+
 use stylist::{css, yew::{styled_component, Global}};
 use yew::prelude::*;
 use yew_router::prelude::*;
-
 use components::organisms::navbar::Navbar;
 use router::{switch, Route};
-
+use common::configuration::get_configuration;
 use contexts::{use_theme, ThemeKind, ThemeProvider};
+use frontend::AppData;
 
 mod components;
 mod contexts;
@@ -48,10 +50,17 @@ fn App() -> Html {
 
 #[styled_component]
 pub fn Root() -> Html {
+    let login_url = format!("https://{}:{}/client-login", "matts-imac.local", "3000");
+    let app_data = use_memo(|_| {
+        AppData { login_url } 
+    }, ());
+
     html! {
-        <ThemeProvider>
-            <App />
-        </ThemeProvider>
+        <ContextProvider<Rc<AppData>> context={app_data}>
+            <ThemeProvider>
+                <App />
+            </ThemeProvider>
+        </ContextProvider<Rc<AppData>>>
     }
 }
 
@@ -59,3 +68,6 @@ fn main() {
     //console_log::init_with_level(Level::Trace).expect("Failed to initialise Log!");
     yew::Renderer::<Root>::new().render();
 }
+
+
+
