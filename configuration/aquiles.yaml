@@ -1,4 +1,7 @@
 application:
   host: 0.0.0.0
-  oauth_redirect_host: aquiles.local
-  oauth_server: aquiles.local:9011
+  oauth_redirect_url: http://aquiles.local:3000/oauth-redirect
+  after_login_url: http://aquiles.local:8080/login-success
+  oauth_url: http://aquiles.local:9011/oauth2/authorize
+  token_url: http://aquiles.local:9011/oauth2/token
+  revoke_url: http://aquiles.local:9011/revoke

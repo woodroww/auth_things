@@ -84,7 +84,7 @@ pub async fn logout(
 }
 
 pub async fn receive_token(
-    _app_data: web::Data<YogaAppData>,
+    app_data: web::Data<YogaAppData>,
     token: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -141,10 +141,7 @@ pub async fn receive_token(
         app_data.oauth_redirect_host, app_data.port
     );
     */
-    // yew path
-    //let after_login_url = format!("https://baeuerlin.net/login-success");
-
-    let after_login_url = format!("http://matts-imac.local/login-success");
+    // back to yew path
 
     let cookie = Cookie::build("email", "pretend_email")
         .path("/")
@@ -153,7 +150,7 @@ pub async fn receive_token(
         .finish();
 
     Ok(HttpResponse::Found()
-        .append_header((actix_web::http::header::LOCATION, after_login_url))
+        .append_header((actix_web::http::header::LOCATION, app_data.after_login_url.clone()))
         .content_type(ContentType::html())
         .cookie(cookie)
         .finish())

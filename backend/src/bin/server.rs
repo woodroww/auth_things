@@ -56,6 +56,7 @@ async fn main() -> std::io::Result<()> {
         client_id: Secret::new(configuration.application.client_id.clone()),
         client_secret: Secret::new(configuration.application.client_secret.clone()),
         oauth_redirect_url: configuration.application.oauth_redirect_url,
+        after_login_url: configuration.application.after_login_url,
     });
 
     //let redis_uri = "redis://127.0.0.1:6379";

@@ -10,5 +10,6 @@ pub struct YogaAppData {
     pub client_secret: Secret<String>,
     pub host: String,
     pub oauth_redirect_url: String,
+    pub after_login_url: String,
     pub port: String,
 }

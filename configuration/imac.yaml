@@ -1,6 +1,7 @@
 application:
   host: matts-imac.local
   oauth_redirect_url: http://matts-imac.local:3000/oauth-redirect
+  after_login_url: http://matts-imac.local:8080/login-success
   oauth_url: http://aquiles.local:9011/oauth2/authorize
   token_url: http://aquiles.local:9011/oauth2/token
   revoke_url: http://aquiles.local:9011/revoke

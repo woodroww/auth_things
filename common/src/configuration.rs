@@ -11,6 +11,7 @@ pub struct ApplicationSettings {
     pub client_secret: String,
     pub client_id: String,
     pub oauth_redirect_url: String,
+    pub after_login_url: String,
     pub oauth_url: String,
     pub token_url: String,
     pub revoke_url: String,

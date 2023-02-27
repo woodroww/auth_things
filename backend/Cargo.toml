@@ -7,7 +7,6 @@ edition = "2021"
 name = "server"
 
 [dependencies]
-actix-web = { version = "4.3.0", features = ["openssl"] }
 actix-session = { version = "0.7.2", features = ["cookie-session", "redis-rs-session"] }
 actix-web = { version = "4.3.0", features = ["openssl"] }
 base64 = "0.21.0"
