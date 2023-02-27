@@ -7,8 +7,17 @@ edition = "2021"
 name = "server"
 
 [dependencies]
+<<<<<<< Updated upstream
 actix-session = { version = "0.7.2", features = ["cookie-session"] }
+<<<<<<< HEAD
 actix-web = { version = "4.3.0", features = ["openssl"] }
+=======
+actix-web = "4.3.0"
+=======
+actix-session = { version = "0.7.2", features = ["cookie-session", "redis-rs-session"] }
+actix-web = { version = "4.3.0", features = ["openssl"] }
+>>>>>>> Stashed changes
+>>>>>>> 76c3fce (redis dev)
 base64 = "0.21.0"
 secrecy = "0.8.0"
 serde = { version = "1", features = ["derive"] }

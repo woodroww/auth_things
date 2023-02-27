@@ -1,7 +1,5 @@
-//use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
-
 use actix_web_lab::web::spa;
-use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
+use actix_session::{storage::RedisSessionStore, config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{
     cookie::{self, Key},
     web, App, HttpServer,
@@ -59,6 +57,9 @@ async fn main() -> std::io::Result<()> {
         client_secret: Secret::new(configuration.application.client_secret.clone()),
         oauth_redirect_url: configuration.application.oauth_redirect_url,
     });
+
+    //let redis_uri = "redis://127.0.0.1:6379";
+    //let redis_store = RedisSessionStore::new(redis_uri).await.unwrap();
 
     let bind_address = (configuration.application.host, configuration.application.port.parse::<u16>().unwrap());
 

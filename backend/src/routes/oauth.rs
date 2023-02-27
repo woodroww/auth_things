@@ -26,22 +26,25 @@ pub async fn request_login_uri(
         PkceCodeChallenge::new_random_sha256();
     session.set_pkce_verifier(pkce_verifier)?;
 
-    // Generate the full authorization URL.
-    // cross site request forgery token
+    // Generate the full authorization URL and a cross site request forgery token
+    // google
+    /*
     let (auth_url, csrf_token) = app_data
         .oauth_client
         .authorize_url(CsrfToken::new_random)
-        // Set the desired scopes.
-        //.add_scope(Scope::new("read".to_string()))
-        //.add_scope(Scope::new("write".to_string()))
-        // maybe google
         //.add_scope(Scope::new("email".to_string()))
-        // google 1 of 2
         .add_scope(Scope::new("openid".to_string()))
-        // google 2 of 2
         .add_scope(Scope::new("profile".to_string()))
+        .set_pkce_challenge(pkce_challenge)
+        .url();
+    */
+
+    let (auth_url, csrf_token) = app_data
+        .oauth_client
+        .authorize_url(CsrfToken::new_random)
+        .add_scope(Scope::new("read".to_string()))
+        .add_scope(Scope::new("write".to_string()))
         //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
-        // Set the PKCE code challenge.
         .set_pkce_challenge(pkce_challenge)
         .url();
 
