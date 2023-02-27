@@ -1,6 +1,8 @@
 use crate::session_state::TypedSession;
 use actix_web::{web, HttpResponse, http::header::ContentType};
 
+
+#[actix_web::get("/poses")]
 pub async fn look_at_poses(
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {

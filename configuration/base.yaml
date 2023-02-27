@@ -1,8 +1,9 @@
 application:
   port: 3000
 database:
-  host: "localhost"
-  port: 5432
   username: "postgres"
   password: "password"
+  port: 5432
+  host: "localhost"
   database_name: "newsletter"
+  require_ssl: false

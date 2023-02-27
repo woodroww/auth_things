@@ -57,6 +57,7 @@ pub async fn request_login_uri(
         .body(""))
 }
 
+#[actix_web::get("/logout")]
 pub async fn logout(
     session: TypedSession,
     app_data: web::Data<YogaAppData>,
