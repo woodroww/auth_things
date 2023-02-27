@@ -1,9 +1,9 @@
 use actix_session::{Session, SessionExt, SessionGetError, SessionInsertError};
 use actix_web::dev::Payload;
 use actix_web::{FromRequest, HttpRequest};
-use oauth2::basic::BasicTokenType;
-use oauth2::{CsrfToken, EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, AccessToken, RefreshToken};
+use oauth2::{CsrfToken, PkceCodeVerifier, AccessToken, RefreshToken};
 use std::future::{ready, Ready};
+use uuid::Uuid;
 
 pub struct TypedSession(Session);
 
@@ -12,10 +12,20 @@ impl TypedSession {
     const PKCE_VERIFIER_KEY: &'static str = "oauth_code_verifier";
     const TOKEN_KEY: &'static str = "access_token";
     const REFRESH_KEY: &'static str = "refresh_token";
+    const USER_ID_KEY: &'static str = "user_id";
 
+    pub fn insert_user_id(&self, user_id: Uuid) -> Result<(), SessionInsertError> {
+        self.0.insert(Self::USER_ID_KEY, user_id)
+    }
+    pub fn get_user_id(&self) -> Result<Option<Uuid>, SessionGetError> {
+        self.0.get(Self::USER_ID_KEY)
+    }
+
+    // logout
     pub fn purge(&self) {
         self.0.purge()
     }
+    // rotate
     pub fn renew(&self) {
         self.0.renew();
     }

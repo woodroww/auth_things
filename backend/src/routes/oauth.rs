@@ -3,7 +3,7 @@ use crate::session_state::TypedSession;
 use actix_web::{http::header::ContentType, web, HttpResponse, cookie::{
     time::{Duration, OffsetDateTime},
     Cookie, SameSite,
-}};
+}, HttpRequest};
 use oauth2::{basic::BasicTokenType, /*StandardRevocableToken*/};
 use oauth2::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, TokenResponse};
@@ -16,7 +16,6 @@ pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
-    tracing::info!("request_login_uri");
     // OAuth flow
     // 2. The client (this app) redirects browser to the authorization server.
     // Through the Login link leading to auth_url.
@@ -51,7 +50,7 @@ pub async fn request_login_uri(
     // Save the state token to verify later.
     session.set_state(csrf_token)?;
 
-    // The web page the user sees with the link to the authorization server
+    // send back the link to the auth provider
     Ok(HttpResponse::Found()
         .append_header((actix_web::http::header::LOCATION, Into::<String>::into(auth_url)))
         .body(""))
@@ -63,8 +62,14 @@ pub async fn logout(
     app_data: web::Data<YogaAppData>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let token = session.get_access_token()?;
+
+    // Since we are using session-based authentication a user is logged in if there is a valid
+    // user id associated with the user_id key in the session state. To log out it is engough to
+    // delete the session.
+    // Removes session both client and server side.
     session.purge();
 
+    // TODO: determine if we need to do this
     if let Some(token) = token {
         /*
         let revoke_token: StandardRevocableToken = match token.refresh_token() {
@@ -91,34 +96,15 @@ pub async fn receive_token(
 ) -> Result<HttpResponse, actix_web::Error> {
     // oauth flow
     // 8. The client doesn't understand the token but can use it to send requests to the resource server
+
     // tracing::info!("matts fun token:\n{:#?}", token);
 
     // The access token issued by the authorization server.
     let jwt = token.access_token();
     session.set_access_token(jwt.clone())?;
 
-    let jambones = jwt.secret().clone();
-    match serde_json::from_str(&jambones) {
-        Ok(value) => {
-            tracing::info!("json OK");
-            match value {
-                Value::Null => tracing::info!("Null"),
-                Value::Bool(_) => tracing::info!("Bool"),
-                Value::Number(_) => tracing::info!("Number"),
-                Value::String(_) => tracing::info!("String"),
-                Value::Array(_) => tracing::info!("Array"),
-                Value::Object(_) => tracing::info!("Object"),
-            }
-        }
-        Err(_) => tracing::info!("json un parsed"),
-    }
-    // JWT header
-    //let header: Header = decode_header(&jwt).unwrap();
-    //let kid = header.kid.clone().unwrap();
-    // book has
-    // accessToken, idToken, refreshToken
-    // https://fusionauth.io/learn/expert-advice/tokens/jwt-components-explained
-    // nonce can be verified if I knew how to send on, it is for openid
+    //let token_type = token.token_type();
+    //let expires_in = token.expires_in();
 
     match token.refresh_token() {
         Some(refresh) => {
@@ -136,17 +122,10 @@ pub async fn receive_token(
         }
     }
 
-    /*
-    let logout_uri = format!(
-        "http://{}:{}/logout",
-        app_data.oauth_redirect_host, app_data.port
-    );
-    */
-    // back to yew path
-
+    // back to frontend
     let cookie = Cookie::build("email", "pretend_email")
         .path("/")
-        .same_site(SameSite::Lax)
+        .same_site(SameSite::Strict)
         .expires(OffsetDateTime::now_utc().checked_add(Duration::minutes(60)))
         .finish();
 
@@ -163,16 +142,11 @@ pub struct LoginRedirect {
     state: String,
 }
 
-// http://matts-imac.local:3000/oauth-redirect?
-// code=kvJr7Yq14vLS6dDAWqrLME0twYc2wEA4XlqQf4DsIxM
-// locale=en
-// state=zcEnPKPkA-uDSPNCJqXmfw
-// userState=Authenticated
-
 #[actix_web::get("/oauth-redirect")]
 pub async fn oauth_login_redirect(
     app_data: web::Data<YogaAppData>,
     login: web::Query<LoginRedirect>,
+    //request: HttpRequest,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
     tracing::info!("oauth_login_redirect");

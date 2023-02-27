@@ -5,12 +5,21 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 use components::organisms::navbar::Navbar;
 use router::{switch, Route};
-use contexts::{use_theme, ThemeKind, ThemeProvider};
-use frontend::AppData;
+use contexts::{use_theme, ThemeProvider};
 
 mod components;
-mod contexts;
 mod router;
+mod contexts;
+mod api;
+
+//const BASE_URL: &str = include_str!("api_base_url.txt");
+pub const BACKEND_BASE_URL: &str = std::env!("BACKEND_BASE_URL");
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct AppData {
+    pub login_url: String,
+}
+
 
 #[styled_component]
 fn App() -> Html {
