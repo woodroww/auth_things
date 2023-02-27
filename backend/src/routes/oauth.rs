@@ -28,7 +28,6 @@ pub async fn request_login_uri(
 
     // Generate the full authorization URL and a cross site request forgery token
     // google
-    /*
     let (auth_url, csrf_token) = app_data
         .oauth_client
         .authorize_url(CsrfToken::new_random)
@@ -37,8 +36,8 @@ pub async fn request_login_uri(
         .add_scope(Scope::new("profile".to_string()))
         .set_pkce_challenge(pkce_challenge)
         .url();
-    */
 
+    /*
     let (auth_url, csrf_token) = app_data
         .oauth_client
         .authorize_url(CsrfToken::new_random)
@@ -47,6 +46,7 @@ pub async fn request_login_uri(
         //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
         .set_pkce_challenge(pkce_challenge)
         .url();
+    */
 
     // Save the state token to verify later.
     session.set_state(csrf_token)?;
