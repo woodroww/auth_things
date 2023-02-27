@@ -10,7 +10,7 @@ name = "server"
 actix-session = { version = "0.7.2", features = ["cookie-session", "redis-rs-session"] }
 actix-web = { version = "4.3.0", features = ["openssl"] }
 base64 = "0.21.0"
-secrecy = "0.8.0"
+secrecy = { version = "0.8", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 tracing = { version = "0.1.37", features = ["log"] }
 tracing-actix-web = "0.7.2"
@@ -22,8 +22,21 @@ serde_json = "1.0.93"
 oauth2 = "4.3.0"
 url = "2.3.1"
 anyhow = "1.0.69"
-#config = "0.13.3"
+config = "0.13.3"
 jsonwebtoken = "8.2.0"
 openssl = "0.10.45"
 actix-web-lab = { version = "0.19.0", features = ["spa"] }
-common = { path = "../common" }
+serde-aux = "4.1.2"
+
+[dependencies.sqlx]
+version = "0.6.2"
+default-features = false
+features = [
+	"runtime-actix-rustls",
+	"macros",
+	"postgres",
+	"uuid",
+	"chrono",
+	"migrate",
+	"offline"
+]

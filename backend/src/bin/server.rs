@@ -9,10 +9,11 @@ use oauth2::{
     AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl,
 };
 
-use common::configuration::get_configuration;
+use backend::configuration::get_configuration;
 use backend::YogaAppData;
 use secrecy::Secret;
 use tracing_actix_web::TracingLogger;
+use sqlx::{postgres::{PgConnectOptions, PgSslMode}, ConnectOptions};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -22,23 +23,6 @@ async fn main() -> std::io::Result<()> {
         .with_max_level(tracing::Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
-
-    //let fusion_uri = format!("http://{}/oauth2/authorize", configuration.application.oauth_server);
-    //let token_endpoint = format!("http://{}/oauth2/token", configuration.application.oauth_server);
-
-    /*
-    let oauth_url = String::from("https://accounts.google.com/o/oauth2/v2/auth");
-    let token_url = String::from("https://oauth2.googleapis.com/token");
-    let revoke_url = String::from("https://oauth2.googleapis.com/revoke");
-    let redirect_uri = String::from("https://baeuerlin.net/oauth-redirect");
-    */
-
-    /*
-    let redirect_uri = format!(
-        "https://{}:{}/oauth-redirect",
-        configuration.application.oauth_redirect_host, configuration.application.port
-    );
-    */
 
     let client = BasicClient::new(
         ClientId::new(configuration.application.client_id.clone()),
@@ -69,9 +53,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            //.route("/client-login", web::get().to(backend::routes::oauth::request_login_uri))
             .service(backend::routes::oauth::request_login_uri)
-            //.route("/oauth-redirect", web::get().to(backend::routes::oauth::oauth_login_redirect))
             .service(backend::routes::oauth::oauth_login_redirect)
             .route("/logout", web::get().to(backend::routes::oauth::logout))
             .route("/health_check", web::get().to(backend::routes::health_check))
@@ -86,16 +68,12 @@ async fn main() -> std::io::Result<()> {
             .app_data(yoga_data.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-                    // If the cookie is set as secure, it will only be transmitted when the
-                    // connection is secure (using `https`).
-                    // the default is .cookie_secure(true)
-                    // no javascript access to cookies
-                    // the default is .cookie_http_only(true)
+                    // .cookie_secure(true) is default, cookies set as secure, only transmitted when https
+                    // .cookie_http_only(true) is default, no javascript access to cookies
+                    // .cookie_content_security(CookieContentSecurity::Private) is default, encrypted but not signed
                     .session_lifecycle(
                         PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
                     )
-                    // Private - encrypted but not signed
-                    // the default is .cookie_content_security(CookieContentSecurity::Private)
                     .build(),
             )
     })

@@ -4,6 +4,9 @@
 // Config lets you set a set of default parameters and then extend them via merging in
 // configuration from a variety of sources
 
+use secrecy::{ExposeSecret, Secret};
+use serde_aux::field_attributes::deserialize_number_from_string;
+
 #[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     pub port: String,
@@ -18,8 +21,20 @@ pub struct ApplicationSettings {
 }
 
 #[derive(serde::Deserialize, Clone)]
+pub struct DatabaseSettings {
+    pub username: String,
+    pub password: Secret<String>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub host: String,
+    pub database_name: String,
+    pub require_ssl: bool,
+}
+
+#[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub application: ApplicationSettings,
+    pub database: DatabaseSettings,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

@@ -1,5 +1,6 @@
 pub mod session_state;
 pub mod routes;
+pub mod configuration;
 
 use oauth2::basic::BasicClient;
 use secrecy::Secret;
