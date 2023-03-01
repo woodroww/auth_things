@@ -19,6 +19,7 @@ pub struct ApplicationSettings {
     pub oauth_url: String,
     pub token_url: String,
     pub revoke_url: String,
+    pub allowed_origins: Vec<String>,
 }
 
 #[derive(serde::Deserialize, Clone)]

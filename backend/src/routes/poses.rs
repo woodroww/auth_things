@@ -1,58 +1,44 @@
 use crate::session_state::TypedSession;
-use actix_web::{web, HttpResponse, http::header::ContentType};
+use actix_web::HttpResponse;
+use serde::{Deserialize, Serialize};
 
+// also defined in /Users/matt/prog/rust/bevy_things/yoga_matt/frontend/src/api/poses.rs
+#[derive(Serialize, Deserialize)]
+pub struct PoseInfo {
+    pub id: i32,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PoseListResponse {
+    poses: Vec<PoseInfo>,
+}
 
 #[actix_web::get("/poses")]
 pub async fn look_at_poses(
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let authorized = match session.get_access_token() {
+    match session.get_access_token() {
         Ok(maybe_token) => {
             match maybe_token {
                 Some(_) => {
-                    println!("we have a token");
-                    true
+                    let poses = vec![
+                        PoseInfo { id: 0, name: "updog".to_string() },
+                        PoseInfo { id: 1, name: "downdog".to_string() },
+                        PoseInfo { id: 2, name: "yoganidrasana".to_string() },
+                    ];
+                    tracing::info!("we have a token");
+                    Ok(HttpResponse::Ok().json(PoseListResponse { poses }))
                 }
                 None => {
-                    println!("no token");
-                    false
+                    tracing::info!("no token");
+                    Ok(HttpResponse::Unauthorized().into())
                 }
             }
         }
         Err(err) => {
-            println!("error from session {}", err);
-            false
+            tracing::info!("error getting access token from session {}", err);
+            Ok(HttpResponse::InternalServerError().into())
         }
-    };
-    if authorized {
-        Ok(HttpResponse::Ok()
-            .content_type(ContentType::html())
-            .body(format!(
-                r#"<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta http-equiv="content-type" content="text/html; charset=utf-8">
-        <title>Poses</title>
-    </head>
-    <body>
-    <p>Welcome to yogamat my friendly registered user</p>
-    </body>
-    </html>"#,
-            )))
-    } else {
-        Ok(HttpResponse::Ok()
-            .content_type(ContentType::html())
-            .body(format!(
-                r#"<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta http-equiv="content-type" content="text/html; charset=utf-8">
-        <title>Poses</title>
-    </head>
-    <body>
-    <p>You can't come in here this is for true yogis only!</p>
-    </body>
-    </html>"#,
-            )))
     }
 }

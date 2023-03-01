@@ -5,3 +5,6 @@ application:
   oauth_url: http://aquiles.local:9011/oauth2/authorize
   token_url: http://aquiles.local:9011/oauth2/token
   revoke_url: http://aquiles.local:9011/revoke
+  allowed_origins:
+    - http://127.0.0.1:8080
+    - http://matts-imac.local

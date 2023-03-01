@@ -4,8 +4,9 @@ use actix_session::{
 };
 use actix_web::{
     cookie::{self, Key},
-    web, App, HttpServer,
+    web, App, HttpServer, http
 };
+use actix_cors::Cors;
 use actix_web_lab::web::spa;
 use oauth2::{basic::BasicClient, RevocationUrl};
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
@@ -66,20 +67,27 @@ async fn main() -> std::io::Result<()> {
     );
 
     HttpServer::new(move || {
+        let allowed_origins = configuration.application.allowed_origins.clone();
+        let cors = Cors::default()
+            .allowed_origin_fn(move |origin, _req_head| {
+                for allowed in allowed_origins.iter() {
+                    if origin.as_ref().starts_with(allowed.as_bytes()) {
+                        return true;
+                    }
+                }
+                false
+            })
+            .allowed_headers(vec![
+                http::header::AUTHORIZATION,
+                http::header::ACCEPT,
+                http::header::ACCESS_CONTROL_ALLOW_HEADERS,
+                http::header::ACCESS_CONTROL_ALLOW_METHODS,
+                http::header::CONTENT_TYPE,
+                http::header::HeaderName::from_lowercase(b"x-auth-token").unwrap(),
+            ])
+            .allowed_methods(vec!["GET", "POST", "PATCH"])
+            .max_age(3600);
         App::new()
-            .wrap(TracingLogger::default())
-            .service(backend::routes::oauth::request_login_uri)
-            .service(backend::routes::oauth::oauth_login_redirect)
-            .service(backend::routes::oauth::logout)
-            .service(backend::routes::health_check)
-            .service(backend::routes::poses::look_at_poses)
-            .service(
-                spa()
-                    .index_file("./dist/index.html")
-                    .static_resources_mount("/")
-                    .static_resources_location("./dist")
-                    .finish(),
-            )
             .app_data(yoga_data.clone())
             .app_data(db_pool.clone())
             .wrap(
@@ -92,10 +100,31 @@ async fn main() -> std::io::Result<()> {
                     )
                     .build(),
             )
+            .configure(routes)
+            .wrap(cors)
     })
     .bind(bind_address)?
     .run()
     .await
+}
+
+fn routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(backend::routes::health_check)
+        .service(
+            web::scope("/api/v1")
+                .service(backend::routes::oauth::request_login_uri)
+                .service(backend::routes::oauth::oauth_login_redirect)
+                .service(backend::routes::oauth::logout)
+                .service(backend::routes::poses::look_at_poses)
+                .wrap(TracingLogger::default()),
+        )
+        .service(
+            spa()
+                .index_file("../frontend/dist/index.html")
+                .static_resources_mount("/")
+                .static_resources_location("../frontend/dist")
+                .finish(),
+        );
 }
 
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
