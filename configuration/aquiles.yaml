@@ -5,3 +5,5 @@ application:
   oauth_url: http://aquiles.local:9011/oauth2/authorize
   token_url: http://aquiles.local:9011/oauth2/token
   revoke_url: http://aquiles.local:9011/revoke
+  allowed_origins:
+    - http://aquiles.local:8080

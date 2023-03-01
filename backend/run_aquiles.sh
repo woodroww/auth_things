@@ -5,7 +5,7 @@ export APP_APPLICATION__CLIENT_SECRET=glVBoidvxgYjNDg83OSgM-_RXQv1lhAuiI3Kxph--Y
 
 export POSTGRES_USER=matt
 export POSTGRES_PASSWORD=password
-export POSTGRES_PORT=5431
+export POSTGRES_PORT=5432
 export POSTGRES_DB=yogamat
 export DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@aquiles.local:${POSTGRES_PORT}/${POSTGRES_DB}
 

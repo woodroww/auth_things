@@ -4,12 +4,10 @@ RUN apt-get install -y iputils-ping
 RUN apt-get install -y vim
 RUN cargo install --locked trunk
 RUN rustup target add wasm32-unknown-unknown
-ENV APP_ENVIRONMENT production
 COPY frontend frontend
 WORKDIR frontend
 RUN trunk build index.html
 WORKDIR /
-COPY common common
 COPY backend backend
 WORKDIR backend
 RUN cargo build --release --bin server
@@ -24,7 +22,7 @@ RUN apt-get update -y \
 COPY --from=builder backend/target/release/server ./app/server
 COPY --from=builder frontend/dist ./app/dist
 COPY configuration configuration
-ENV APP_ENVIRONMENT production
 WORKDIR app
+ENV APP_ENVIRONMENT aquiles
 ENTRYPOINT ["./server"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]

@@ -7,8 +7,10 @@ use crate::store::PoseStore;
 #[function_component]
 pub fn Portfolio() -> Html {
     let (store, dispatch) = use_store::<PoseStore>();
+    let store_clone = store.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        match crate::api::poses::get_poses("jam").await {
+        let token = store_clone.token.clone();
+        match crate::api::poses::get_poses(&token).await {
             Ok(pose_response) => {
                 dispatch.reduce_mut(|store| store.poses = pose_response.poses);
             }
