@@ -21,16 +21,18 @@ pub async fn get_poses(token: &str) -> Result<PoseListResponse, ApiError> {
     log!("begin get_tasks request");
     let response = Request::new(&format!("{}/poses", BACKEND_BASE_URL))
         .method(reqwasm::http::Method::GET)
-        //.header("x-auth-token", token)
+        .header("x-auth-token", token)
         .send()
-        .await
-        .unwrap();
-    if response.ok() {
-        Ok(response.json::<PoseListResponse>().await.unwrap())
-    } else {
-        match response.status() {
-            401 => Err(ApiError::NotAuthenticated),
-            _ => Err(ApiError::Unknown),
+        .await;
+    match response {
+        Ok(response) => {
+            log!("get_poses reqwasm ok");
+            if response.ok() {
+                log!("get_poses response text", response.text().await.unwrap());
+                return Ok(response.json::<PoseListResponse>().await.unwrap());
+            }
         }
+        Err(_) => log!("get_poses reqwasm err"),
     }
+    Err(ApiError::Unknown)
 }

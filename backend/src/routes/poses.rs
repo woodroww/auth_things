@@ -14,10 +14,12 @@ pub struct PoseListResponse {
     poses: Vec<PoseInfo>,
 }
 
+
 #[actix_web::get("/poses")]
 pub async fn look_at_poses(
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
+    tracing::info!("look_at_poses");
     match session.get_access_token() {
         Ok(maybe_token) => {
             match maybe_token {

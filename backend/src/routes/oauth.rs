@@ -16,6 +16,7 @@ pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
+    tracing::info!("request_login_uri");
     // OAuth flow
     // 2. The client (this app) redirects browser to the authorization server.
     // Through the Login link leading to auth_url.
@@ -123,7 +124,7 @@ pub async fn receive_token(
     }
 
     // back to frontend
-    let cookie = Cookie::build("email", "pretend_email")
+    let cookie = Cookie::build("access_token", jwt.secret())
         .path("/")
         .same_site(SameSite::Strict)
         .expires(OffsetDateTime::now_utc().checked_add(Duration::minutes(60)))

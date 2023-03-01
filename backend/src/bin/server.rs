@@ -61,7 +61,7 @@ async fn main() -> std::io::Result<()> {
     );
 
     tracing::info!(
-        "serving yogamat backend at https://{}:{}",
+        "serving yogamat backend at http://{}:{}",
         bind_address.0,
         bind_address.1
     );
@@ -88,6 +88,19 @@ async fn main() -> std::io::Result<()> {
             .allowed_methods(vec!["GET", "POST", "PATCH"])
             .max_age(3600);
         App::new()
+            .wrap(TracingLogger::default())
+            .service(backend::routes::oauth::request_login_uri)
+            .service(backend::routes::oauth::oauth_login_redirect)
+            .service(backend::routes::oauth::logout)
+            .service(backend::routes::health_check)
+            .service(backend::routes::poses::look_at_poses)
+            .service(
+                spa()
+                    .index_file("./dist/index.html")
+                    .static_resources_mount("/")
+                    .static_resources_location("./dist")
+                    .finish(),
+            )
             .app_data(yoga_data.clone())
             .app_data(db_pool.clone())
             .wrap(
@@ -100,31 +113,11 @@ async fn main() -> std::io::Result<()> {
                     )
                     .build(),
             )
-            .configure(routes)
             .wrap(cors)
     })
     .bind(bind_address)?
     .run()
     .await
-}
-
-fn routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(backend::routes::health_check)
-        .service(
-            web::scope("/api/v1")
-                .service(backend::routes::oauth::request_login_uri)
-                .service(backend::routes::oauth::oauth_login_redirect)
-                .service(backend::routes::oauth::logout)
-                .service(backend::routes::poses::look_at_poses)
-                .wrap(TracingLogger::default()),
-        )
-        .service(
-            spa()
-                .index_file("../frontend/dist/index.html")
-                .static_resources_mount("/")
-                .static_resources_location("../frontend/dist")
-                .finish(),
-        );
 }
 
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
