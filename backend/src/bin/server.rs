@@ -96,9 +96,9 @@ async fn main() -> std::io::Result<()> {
             .service(backend::routes::poses::look_at_poses)
             .service(
                 spa()
-                    .index_file("./dist/index.html")
+                    .index_file("../frontend/dist/index.html")
                     .static_resources_mount("/")
-                    .static_resources_location("./dist")
+                    .static_resources_location("../frontend/dist")
                     .finish(),
             )
             .app_data(yoga_data.clone())
