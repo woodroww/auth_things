@@ -14,7 +14,7 @@ services:
       branch: main
       # Deploy a new version on every commit to `main`!
       # Continuous Deployment, here we come!
-      deploy_on_push: true
+      deploy_on_push: false
       # !!! Fill in with your details
       repo: woodroww/yoga_mat
     # Active probe used by DigitalOcean's to ensure our application is healthy
@@ -36,9 +36,6 @@ services:
       - key: APP_APPLICATION__BASE_URL
         scope: RUN_TIME
         value: ${APP_URL}
-      - key: APP_APPLICATION__CLIENT_ID
-        scope: RUN_TIME
-        value: ${yogamat.CLIENT_ID}
-      - key: APP_APPLICATION__CLIENT_SECRET
-        scope: RUN_TIME
-        value: ${yogamat.CLIENT_SECRET}
+      - key: URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${APP_URL}
