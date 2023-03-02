@@ -1,7 +1,11 @@
-#! spec.yaml - configuration file to create/manage DigitalOcean application
+# spec.yaml - configuration file to create/manage DigitalOcean application
+# https://docs.digitalocean.com/products/app-platform/reference/app-spec/
 name: yogamat
 # https://www.digitalocean.com/docs/app-platform/#regional-availability
 # https://www.digitalocean.com/docs/platform/availability-matrix/
+domains:
+  - domain: baeuerlin.net
+    type: PRIMARY
 region: nyc3
 services:
   - name: yogamat
@@ -14,7 +18,7 @@ services:
       branch: main
       # Deploy a new version on every commit to `main`!
       # Continuous Deployment, here we come!
-      deploy_on_push: false
+      deploy_on_push: true
       # !!! Fill in with your details
       repo: woodroww/yoga_mat
     # Active probe used by DigitalOcean's to ensure our application is healthy
@@ -32,10 +36,8 @@ services:
     # All incoming requests should be routed to our app
     routes:
       - path: /
+    ## these went into the component (NOT the app-level env variables)
     envs:
       - key: APP_APPLICATION__BASE_URL
         scope: RUN_TIME
-        value: ${APP_URL}
-      - key: URL
-        scope: RUN_AND_BUILD_TIME
         value: ${APP_URL}
