@@ -1,6 +1,5 @@
 use actix_session::{
-    config::PersistentSession, storage::CookieSessionStore, storage::RedisSessionStore,
-    SessionMiddleware,
+    config::PersistentSession, storage::CookieSessionStore, SessionMiddleware,
 };
 use actix_web::{
     cookie::{self, Key},
@@ -52,9 +51,6 @@ async fn main() -> std::io::Result<()> {
         after_login_url: configuration.application.after_login_url,
     });
 
-    //let redis_uri = "redis://127.0.0.1:6379";
-    //let redis_store = RedisSessionStore::new(redis_uri).await.unwrap();
-
     let bind_address = (
         configuration.application.host,
         configuration.application.port.parse::<u16>().unwrap(),
@@ -89,17 +85,13 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
         App::new()
             .wrap(TracingLogger::default())
-            .service(backend::routes::oauth::request_login_uri)
-            .service(backend::routes::oauth::oauth_login_redirect)
-            .service(backend::routes::oauth::logout)
-            .service(backend::routes::health_check)
-            .service(backend::routes::poses::look_at_poses)
             .service(
-                spa()
-                    .index_file("../frontend/dist/index.html")
-                    .static_resources_mount("/")
-                    .static_resources_location("../frontend/dist")
-                    .finish(),
+                web::scope("/api/v1")
+                    .service(backend::routes::oauth::request_login_uri)
+                    .service(backend::routes::oauth::oauth_login_redirect)
+                    .service(backend::routes::oauth::logout)
+                    .service(backend::routes::health_check)
+                    .service(backend::routes::poses::look_at_poses)
             )
             .app_data(yoga_data.clone())
             .app_data(db_pool.clone())

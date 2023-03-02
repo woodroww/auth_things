@@ -1,6 +1,6 @@
 application:
   host: 0.0.0.0
-  oauth_redirect_url: https://baeuerlin.net/oauth-redirect
+  oauth_redirect_url: https://portfolio.baeuerlin.net/api/v1/oauth-redirect
   after_login_url: http://baeuerlin.net/login-success
   oauth_url: https://accounts.google.com/o/oauth2/v2/auth
   token_url: https://oauth2.googleapis.com/token

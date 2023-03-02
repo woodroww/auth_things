@@ -2,3 +2,4 @@
 /target
 matt.test.crt
 matt.test.key
+run_digital_ocean.sh
