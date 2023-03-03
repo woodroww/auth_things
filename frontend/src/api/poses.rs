@@ -12,7 +12,7 @@ pub struct PoseInfo {
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PoseListResponse {
     pub poses: Vec<PoseInfo>,
 }
@@ -28,8 +28,9 @@ pub async fn get_poses(token: &str) -> Result<PoseListResponse, ApiError> {
         Ok(response) => {
             log!("get_poses reqwasm ok");
             if response.ok() {
-                log!("get_poses response text", response.text().await.unwrap());
-                return Ok(response.json::<PoseListResponse>().await.unwrap());
+                let json_response = response.json::<PoseListResponse>().await.unwrap();
+                log!(format!("get_poses response text {:?}", json_response));
+                return Ok(json_response);
             }
         }
         Err(_) => log!("get_poses reqwasm err"),
