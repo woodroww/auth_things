@@ -28,8 +28,8 @@ jobs:
         run: mkdir ~/.ssh && chmod 700 ~/.ssh
       - name: Install the deploy key
         run: echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          #- name: Create the known hosts
-          #run: echo "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Create the known hosts
+        run: echo "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
           #- name: Check the frontend
           #run: cd $GITHUB_WORKSPACE/frontend && cargo check
       - name: deploy
