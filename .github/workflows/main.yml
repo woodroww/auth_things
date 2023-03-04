@@ -31,7 +31,10 @@ jobs:
       - name: Create the known hosts
         run: ssh-keyscan -H portfolio.baeuerlin.net > ~/.ssh/known_hosts
       - name: Check the frontend
-        run: cd $GITHUB_WORKSPACE/frontend && cargo check
+        run: |
+          echo "trouble ${{ vars.API_BASE_URL }}"
+          export API_BASE_URL=${{ vars.API_BASE_URL }}
+          cd $GITHUB_WORKSPACE/frontend && cargo check
       - name: Check the backend
         run: cd $GITHUB_WORKSPACE/backend && cargo check
       - name: deploy
