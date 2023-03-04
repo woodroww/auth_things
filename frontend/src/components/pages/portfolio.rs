@@ -2,7 +2,7 @@ use gloo_console::log;
 use yew::prelude::*;
 use yewdux::prelude::*;
 
-use crate::store::PoseStore;
+use crate::{store::PoseStore, api::poses::PoseInfo};
 
 #[function_component]
 pub fn Portfolio() -> Html {
@@ -20,9 +20,29 @@ pub fn Portfolio() -> Html {
         }
     });
     log!("poses: {}", store.poses.len());
+
+    /*
+    let tasks: Vec<TaskInfo> = use_store::<StoreType>()
+        .state()
+        .map(|store| store.tasks.clone())
+        .unwrap_or_default();
+    */
     html! {
         <>
             <h1>{"Amazing Projects"}</h1>
+            {pose_data(&store.poses)}
         </>
     }
 }
+
+fn pose_data(poses: &Vec<PoseInfo>) -> Html {
+    html! {
+        poses.into_iter().map(|pose| {
+            html!{
+                <p>{ format!("id: {} name: {}", pose.id, pose.name) }</p>
+            }
+        }).collect::<Html>()
+    }
+}
+
+

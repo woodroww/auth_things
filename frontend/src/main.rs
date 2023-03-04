@@ -13,7 +13,7 @@ mod contexts;
 mod api;
 mod store;
 
-const BACKEND_BASE_URL: &str = include_str!("api_base_url");
+const API_BASE_URL: &str = std::env!("API_BASE_URL");
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct AppData {

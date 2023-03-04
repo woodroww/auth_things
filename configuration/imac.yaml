@@ -1,10 +1,19 @@
 application:
   host: matts-imac.local
-  oauth_redirect_url: http://matts-imac.local:3000/oauth-redirect
+  oauth_redirect_url: http://matts-imac.local:3000/api/v1/oauth-redirect
   after_login_url: http://matts-imac.local:3000/login-success
-  oauth_url: http://aquiles.local:9011/oauth2/authorize
-  token_url: http://aquiles.local:9011/oauth2/token
-  revoke_url: http://aquiles.local:9011/revoke
+  oauth_providers:
+    -
+      name: fusion
+      oauth_url: http://aquiles.local:9011/oauth2/authorize
+      token_url: http://aquiles.local:9011/oauth2/token
+      revoke_url: http://aquiles.local:9011/revoke
+    -
+      name: google
+      oauth_url: https://accounts.google.com/o/oauth2/v2/auth
+      token_url: https://oauth2.googleapis.com/token
+      revoke_url: https://oauth2.googleapis.com/revoke
   allowed_origins:
     - http://127.0.0.1:8080
     - http://matts-imac.local
+    - http://aquiles.local:9011

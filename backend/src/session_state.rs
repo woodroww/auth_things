@@ -13,6 +13,14 @@ impl TypedSession {
     const TOKEN_KEY: &'static str = "access_token";
     const REFRESH_KEY: &'static str = "refresh_token";
     const USER_ID_KEY: &'static str = "user_id";
+    const OAUTH_PROVIDER_KEY: &'static str = "oauth_provider";
+
+    pub fn insert_oauth_provider(&self, provider: String) -> Result<(), SessionInsertError> {
+        self.0.insert(Self::OAUTH_PROVIDER_KEY, provider)
+    }
+    pub fn get_oauth_provider(&self) -> Result<Option<String>, SessionGetError> {
+        self.0.get(Self::OAUTH_PROVIDER_KEY)
+    }
 
     pub fn insert_user_id(&self, user_id: Uuid) -> Result<(), SessionInsertError> {
         self.0.insert(Self::USER_ID_KEY, user_id)

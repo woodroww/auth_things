@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use actix_session::{
     config::PersistentSession, storage::CookieSessionStore, SessionMiddleware,
 };
@@ -25,24 +27,30 @@ async fn main() -> std::io::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
-    let client = BasicClient::new(
-        ClientId::new(configuration.application.client_id.clone()),
-        Some(ClientSecret::new(
-            configuration.application.client_secret.clone(),
-        )),
-        AuthUrl::new(configuration.application.oauth_url).unwrap(),
-        Some(TokenUrl::new(configuration.application.token_url).unwrap()),
-    )
-    .set_redirect_uri(
-        RedirectUrl::new(configuration.application.oauth_redirect_url.clone()).unwrap(),
-    )
-    .set_revocation_uri(RevocationUrl::new(configuration.application.revoke_url).unwrap());
+    let mut clients = HashMap::new();
+    for provider in configuration.application.oauth_providers {
+
+        let client = BasicClient::new(
+            ClientId::new(configuration.application.client_id.clone()),
+            Some(ClientSecret::new(
+                configuration.application.client_secret.clone(),
+            )),
+            AuthUrl::new(provider.oauth_url).unwrap(),
+            Some(TokenUrl::new(provider.token_url).unwrap()),
+        )
+        .set_redirect_uri(
+            RedirectUrl::new(configuration.application.oauth_redirect_url.clone()).unwrap(),
+        )
+        .set_revocation_uri(RevocationUrl::new(provider.revoke_url).unwrap());
+        clients.insert(provider.name, client);
+    }
+
 
     let connection_pool = get_connection_pool(&configuration.database);
     let db_pool = web::Data::new(connection_pool);
 
     let yoga_data = web::Data::new(YogaAppData {
-        oauth_client: client,
+        oauth_clients: clients,
         host: configuration.application.host.clone(),
         port: configuration.application.port.clone(),
         client_id: Secret::new(configuration.application.client_id.clone()),

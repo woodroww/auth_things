@@ -16,10 +16,16 @@ pub struct ApplicationSettings {
     pub client_id: String,
     pub oauth_redirect_url: String,
     pub after_login_url: String,
+    pub allowed_origins: Vec<String>,
+    pub oauth_providers: Vec<OAuthProvider>,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct OAuthProvider {
+    pub name: String,
     pub oauth_url: String,
     pub token_url: String,
     pub revoke_url: String,
-    pub allowed_origins: Vec<String>,
 }
 
 #[derive(serde::Deserialize, Clone)]

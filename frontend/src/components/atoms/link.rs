@@ -17,7 +17,7 @@ pub fn bb_link(props: &LinkProps) -> Html {
     let link_style = css!(r#"
         color: ${link_color};
         text-decoration: none;
-        font-size: 18px;
+        font-size: 16px;
     "#,
         link_color = theme.link_color.clone(),
     );

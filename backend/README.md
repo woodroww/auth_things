@@ -21,5 +21,4 @@ sudo docker run --env-file ./.env -d -p 3000:3000 yogamat
 ### stop a running container
 sudo docker stop container_id
 
-
-
+curl -w %{response_code} https://portfolio.baeuerlin.net/api/v1/health_check

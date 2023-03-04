@@ -7,16 +7,22 @@ use actix_web::{http::header::ContentType, web, HttpResponse, cookie::{
 use oauth2::{basic::BasicTokenType, /*StandardRevocableToken*/};
 use oauth2::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, TokenResponse};
+use oauth2::{basic::BasicClient, RevocationUrl};
 
 // use secrecy::ExposeSecret;
 use serde_json::Value;
 
-#[actix_web::get("/client-login")]
+#[actix_web::get("/client-login/{service}")]
 pub async fn request_login_uri(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
+    path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     tracing::info!("request_login_uri");
+    let oauth_provider = path.into_inner();
+
+    tracing::info!("oauth_provider {}", oauth_provider);
+
     // OAuth flow
     // 2. The client (this app) redirects browser to the authorization server.
     // Through the Login link leading to auth_url.
@@ -27,26 +33,48 @@ pub async fn request_login_uri(
     session.set_pkce_verifier(pkce_verifier)?;
 
     // Generate the full authorization URL and a cross site request forgery token
-    // google
-    let (auth_url, csrf_token) = app_data
-        .oauth_client
-        .authorize_url(CsrfToken::new_random)
-        //.add_scope(Scope::new("email".to_string()))
-        .add_scope(Scope::new("openid".to_string()))
-        .add_scope(Scope::new("profile".to_string()))
-        .set_pkce_challenge(pkce_challenge)
-        .url();
-
-    /*
-    let (auth_url, csrf_token) = app_data
-        .oauth_client
-        .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("read".to_string()))
-        .add_scope(Scope::new("write".to_string()))
-        //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
-        .set_pkce_challenge(pkce_challenge)
-        .url();
-    */
+    let (auth_url, csrf_token) = match oauth_provider.as_str() {
+        "google" => {
+            match app_data.oauth_clients.get("google") {
+                Some(client) => {
+                    session.insert_oauth_provider("google".to_string())?;
+                    client
+                        .authorize_url(CsrfToken::new_random)
+                        //.add_scope(Scope::new("email".to_string()))
+                        .add_scope(Scope::new("openid".to_string()))
+                        .add_scope(Scope::new("profile".to_string()))
+                        .set_pkce_challenge(pkce_challenge)
+                        .url()
+                }
+                None => {
+                    return Ok(HttpResponse::InternalServerError()
+                        .body("oauth provider not in map"))
+                }
+            }
+        }
+        "fusion" => {
+            match app_data.oauth_clients.get("fusion") {
+                Some(client) => {
+                    session.insert_oauth_provider("fusion".to_string())?;
+                    client
+                        .authorize_url(CsrfToken::new_random)
+                        .add_scope(Scope::new("read".to_string()))
+                        .add_scope(Scope::new("write".to_string()))
+                        //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
+                        .set_pkce_challenge(pkce_challenge)
+                        .url()
+                }
+                None => {
+                    return Ok(HttpResponse::InternalServerError()
+                        .body("oauth provider not in map"))
+                }
+            }
+        }
+        _ => {
+            return Ok(HttpResponse::InternalServerError()
+                .body("frontend requested invalid oauth provider"))
+        }
+    };
 
     // Save the state token to verify later.
     session.set_state(csrf_token)?;
@@ -55,6 +83,30 @@ pub async fn request_login_uri(
     Ok(HttpResponse::Found()
         .append_header((actix_web::http::header::LOCATION, Into::<String>::into(auth_url)))
         .body(""))
+}
+
+fn oauth_client<'a>(session: &TypedSession, app_data: &'a web::Data<YogaAppData>) -> Option<&'a BasicClient> {
+    match session.get_oauth_provider() {
+        Ok(session_ok) => match session_ok {
+            Some(provider) => match app_data.oauth_clients.get(&provider) {
+                Some(oauth_client) => {
+                    Some(oauth_client)
+                }
+                None => {
+                    tracing::error!("oauth provider not in map");
+                    None
+                }
+            }
+            None => {
+                tracing::error!("recieved session returned None");
+                None
+            }
+        }
+        Err(session_error) => {
+            tracing::error!("recieved session Err {}", session_error);
+            None
+        }
+    }
 }
 
 #[actix_web::get("/logout")]
@@ -78,11 +130,19 @@ pub async fn logout(
             None => token.access_token().into(),
         };*/
 
-        app_data.oauth_client
-            .revoke_token(/*revoke_token*/token.into())
-            .unwrap()
-            .request(oauth2::reqwest::http_client)
-            .expect("Failed to revoke token");
+        match oauth_client(&session, &app_data) {
+            Some(oauth_client) => {
+                oauth_client
+                    .revoke_token(/*revoke_token*/token.into())
+                    .unwrap()
+                    .request(oauth2::reqwest::http_client)
+                    .expect("Failed to revoke token");
+            }
+            None => {
+                return Ok(HttpResponse::InternalServerError()
+                    .body("session or oauth client error"))
+            }
+        }
     }
 
     Ok(HttpResponse::SeeOther()
@@ -180,20 +240,31 @@ pub async fn oauth_login_redirect(
         // OAuth flow
         // 6. The client then contacts the authorization server directly (not using the resource
         //    owners browser). Securely sends its client id, client secret, authorization code,
-        let token_response = app_data
-            .oauth_client
-            .exchange_code(AuthorizationCode::new(login.code.clone()))
-            .set_pkce_verifier(verifier)
-            .request_async(oauth2::reqwest::async_http_client)
-            .await;
+
+        let token_response = match oauth_client(&session, &app_data) {
+            Some(oauth_client) => {
+                Some(oauth_client
+                    .exchange_code(AuthorizationCode::new(login.code.clone()))
+                    .set_pkce_verifier(verifier)
+                    .request_async(oauth2::reqwest::async_http_client)
+                    .await)
+            }
+            None => {
+                None
+            }
+        };
 
         // OAuth flow
         // 7. The authorization server verifies the data and respondes with an access token
-        if let Ok(token) = token_response {
-            // this is the happy path
-            return receive_token(app_data, token, session).await;
+        if let Some(token) = token_response {
+            if let Ok(token) = token {
+                // this is the happy path
+                return receive_token(app_data, token, session).await;
+            } else {
+                error_str.push_str("did not exchage code for token_response")
+            }
         } else {
-            error_str.push_str("did not exchage code for token_response")
+            error_str.push_str("none from token response")
         }
 
     } else {
