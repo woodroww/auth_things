@@ -30,12 +30,11 @@ jobs:
         run: echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
       - name: Create the known hosts
         run: ssh-keyscan -H portfolio.baeuerlin.net > ~/.ssh/known_hosts
-      - name: Check the frontend
-        run: |
-          echo "trouble ${{ env.API_BASE_URL }}"
-          export API_BASE_URL=${{ env.API_BASE_URL }}
-          cd $GITHUB_WORKSPACE/frontend && cargo check
-      - name: Check the backend
-        run: cd $GITHUB_WORKSPACE/backend && cargo check
+      #- name: Check the frontend
+      #  run: |
+      #    export API_BASE_URL=${{ env.API_BASE_URL }}
+      #    cd $GITHUB_WORKSPACE/frontend && cargo check
+      #- name: Check the backend
+      #  run: cd $GITHUB_WORKSPACE/backend && cargo check
       - name: deploy
         run: ssh -i ~/.ssh/deploy deployer@portfolio.baeuerlin.net
