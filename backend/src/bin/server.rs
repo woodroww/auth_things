@@ -106,7 +106,6 @@ async fn main() -> std::io::Result<()> {
                     .service(backend::routes::oauth::logout)
                     .service(backend::routes::health_check)
                     .service(backend::routes::poses::look_at_poses)
-                    .service(backend::routes::oauth::localhost_redirect),
             )
             .app_data(yoga_data.clone())
             .app_data(db_pool.clone())

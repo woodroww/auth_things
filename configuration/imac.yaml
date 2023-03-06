@@ -1,7 +1,6 @@
 application:
   host: 127.0.0.1
-  #oauth_redirect_url: http://127.0.0.1:3000/api/v1/oauth-redirect
-  oauth_redirect_url: https://portfolio.baeuerlin.net/api/v1/oauth-redirect/local 
+  oauth_redirect_url: http://127.0.0.1:3000/api/v1/oauth-redirect
   after_login_url: http://127.0.0.1:8080/login-success
   allowed_origins:
     - http://127.0.0.1:8080

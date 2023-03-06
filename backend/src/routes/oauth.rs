@@ -219,15 +219,6 @@ pub struct LoginRedirect {
     state: String,
 }
 
-#[actix_web::get("/oauth-redirect/local")]
-pub async fn localhost_redirect(/*request: HttpRequest*/) -> Result<HttpResponse, actix_web::Error> {
-    tracing::info!("localhost_redirect");
-    Ok(HttpResponse::SeeOther()
-        .append_header((actix_web::http::header::LOCATION, "http://127.0.0.1:3000/api/v1/oauth-redirect"))
-        .content_type(ContentType::html())
-        .finish())
-}
-
 #[actix_web::get("/oauth-redirect")]
 pub async fn oauth_login_redirect(
     app_data: web::Data<YogaAppData>,
