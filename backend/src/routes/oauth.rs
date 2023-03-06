@@ -70,6 +70,24 @@ pub async fn request_login_uri(
                 }
             }
         }
+        "github" => {
+            match app_data.oauth_clients.get("github") {
+                Some(client) => {
+                    session.insert_oauth_provider("github".to_string())?;
+                    client
+                        .authorize_url(CsrfToken::new_random)
+                        .add_scope(Scope::new("read".to_string()))
+                        .add_scope(Scope::new("write".to_string()))
+                        //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
+                        .set_pkce_challenge(pkce_challenge)
+                        .url()
+                }
+                None => {
+                    return Ok(HttpResponse::InternalServerError()
+                        .body("oauth provider not in map"))
+                }
+            }
+        }
         _ => {
             return Ok(HttpResponse::InternalServerError()
                 .body("frontend requested invalid oauth provider"))
@@ -261,10 +279,10 @@ pub async fn oauth_login_redirect(
                 // this is the happy path
                 return receive_token(app_data, token, session).await;
             } else {
-                error_str.push_str("did not exchage code for token_response")
+                error_str.push_str("<p>did not exchage code for token_response</p>")
             }
         } else {
-            error_str.push_str("none from token response")
+            error_str.push_str("<p>none from token response</p>")
         }
 
     } else {
@@ -272,18 +290,18 @@ pub async fn oauth_login_redirect(
         if let Ok(s) = session.get_state() {
             if let Some(_state) = s {
             } else {
-                error_str.push_str("get_state Ok() but None, there is no session state")
+                error_str.push_str("<p>get_state Ok() but None, there is no session state</p>")
             }
         } else {
-            error_str.push_str("get_state Err(), there is no session state")
+            error_str.push_str("<p>get_state Err(), there is no session state</p>")
         }
         if let Ok(v) = session.get_pkce_verifier() {
             if let Some(_verifier) = v {
             } else {
-                error_str.push_str("get_pkce_verifier Ok() but None, there is no pkce_verifier")
+                error_str.push_str("<p>get_pkce_verifier Ok() but None, there is no pkce_verifier</p>")
             }
         } else {
-            error_str.push_str("get_pkce_verifier Err(), there is no pkce_verifier")
+            error_str.push_str("<p>get_pkce_verifier Err(), there is no pkce_verifier</p>")
         }
     }
 
@@ -299,7 +317,7 @@ pub async fn oauth_login_redirect(
 </head>
 <body>
 <p>Something went wrong with OAuth</p>
-<p>{}</p>
+{}
 </body>
 </html>"#, error_str
         )))

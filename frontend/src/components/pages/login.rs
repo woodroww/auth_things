@@ -13,6 +13,7 @@ use stylist::{yew::styled_component, css};
 pub fn Login() -> Html {
     let login_google_url = format!("{}/client-login/google", API_BASE_URL);
     let login_fusion_url = format!("{}/client-login/fusion", API_BASE_URL);
+    let login_github_url = format!("{}/client-login/github", API_BASE_URL);
 
     let theme = use_theme();
     let link_style = css!(r#"
@@ -28,7 +29,8 @@ pub fn Login() -> Html {
             <h1>{"Login Page"}</h1>
             <ul>
                 <li><a href={login_google_url} class={link_style.clone()}>{"Login Google"}</a></li>
-                <li><a href={login_fusion_url} class={link_style}>{"Login Fusion"}</a></li>
+                <li><a href={login_fusion_url} class={link_style.clone()}>{"Login Fusion"}</a></li>
+                <li><a href={login_github_url} class={link_style}>{"Login GitHub"}</a></li>
             </ul>
         </>
     }

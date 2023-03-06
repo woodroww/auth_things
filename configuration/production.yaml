@@ -2,16 +2,5 @@ application:
   host: 0.0.0.0
   oauth_redirect_url: https://portfolio.baeuerlin.net/api/v1/oauth-redirect
   after_login_url: https://portfolio.baeuerlin.net/login-success
-  oauth_providers:
-    -
-      name: fusion
-      oauth_url: http://aquiles.local:9011/oauth2/authorize
-      token_url: http://aquiles.local:9011/oauth2/token
-      revoke_url: http://aquiles.local:9011/revoke
-    -
-      name: google
-      oauth_url: https://accounts.google.com/o/oauth2/v2/auth
-      token_url: https://oauth2.googleapis.com/token
-      revoke_url: https://oauth2.googleapis.com/revoke
   allowed_origins:
     - https://portfolio.baeuerlin.net

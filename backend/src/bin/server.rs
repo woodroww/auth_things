@@ -1,21 +1,15 @@
-use std::collections::HashMap;
-
-use actix_session::{
-    config::PersistentSession, storage::CookieSessionStore, SessionMiddleware,
-};
+use actix_cors::Cors;
+use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{
     cookie::{self, Key},
-    web, App, HttpServer, http
+    http, web, App, HttpServer,
 };
-use actix_cors::Cors;
-use actix_web_lab::web::spa;
-use oauth2::{basic::BasicClient, RevocationUrl};
-use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
-
 use backend::configuration::{get_configuration, DatabaseSettings};
 use backend::YogaAppData;
-use secrecy::Secret;
+use oauth2::{basic::BasicClient, RevocationUrl};
+use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::collections::HashMap;
 use tracing_actix_web::TracingLogger;
 
 #[actix_web::main]
@@ -29,22 +23,36 @@ async fn main() -> std::io::Result<()> {
 
     let mut clients = HashMap::new();
     for provider in configuration.application.oauth_providers {
-
-        let client = BasicClient::new(
-            ClientId::new(configuration.application.client_id.clone()),
-            Some(ClientSecret::new(
-                configuration.application.client_secret.clone(),
-            )),
-            AuthUrl::new(provider.oauth_url).unwrap(),
-            Some(TokenUrl::new(provider.token_url).unwrap()),
-        )
-        .set_redirect_uri(
-            RedirectUrl::new(configuration.application.oauth_redirect_url.clone()).unwrap(),
-        )
-        .set_revocation_uri(RevocationUrl::new(provider.revoke_url).unwrap());
-        clients.insert(provider.name, client);
+        let client_id_key = format!("{}_CLIENT_ID", provider.name.to_uppercase());
+        let client_id = match std::env::var(client_id_key.clone()) {
+            Ok(value) => Some(value),
+            Err(_) => {
+                tracing::error!("couldn't get {} from environment", client_id_key);
+                None
+            }
+        };
+        let client_secret_key = format!("{}_CLIENT_SECRET", provider.name.to_uppercase());
+        let client_secret = match std::env::var(client_secret_key.clone()) {
+            Ok(value) => Some(value),
+            Err(_) => {
+                tracing::error!("couldn't get {} from environment", client_secret_key);
+                None
+            }
+        };
+        if let (Some(id), Some(secret)) = (client_id, client_secret) {
+            let client = BasicClient::new(
+                ClientId::new(id),
+                Some(ClientSecret::new(secret)),
+                AuthUrl::new(provider.oauth_url).unwrap(),
+                Some(TokenUrl::new(provider.token_url).unwrap()),
+            )
+            .set_redirect_uri(
+                RedirectUrl::new(configuration.application.oauth_redirect_url.clone()).unwrap(),
+            )
+            .set_revocation_uri(RevocationUrl::new(provider.revoke_url).unwrap());
+            clients.insert(provider.name, client);
+        }
     }
-
 
     let connection_pool = get_connection_pool(&configuration.database);
     let db_pool = web::Data::new(connection_pool);
@@ -53,9 +61,6 @@ async fn main() -> std::io::Result<()> {
         oauth_clients: clients,
         host: configuration.application.host.clone(),
         port: configuration.application.port.clone(),
-        client_id: Secret::new(configuration.application.client_id.clone()),
-        client_secret: Secret::new(configuration.application.client_secret.clone()),
-        oauth_redirect_url: configuration.application.oauth_redirect_url,
         after_login_url: configuration.application.after_login_url,
     });
 
@@ -99,15 +104,12 @@ async fn main() -> std::io::Result<()> {
                     .service(backend::routes::oauth::oauth_login_redirect)
                     .service(backend::routes::oauth::logout)
                     .service(backend::routes::health_check)
-                    .service(backend::routes::poses::look_at_poses)
+                    .service(backend::routes::poses::look_at_poses),
             )
             .app_data(yoga_data.clone())
             .app_data(db_pool.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-                    // .cookie_secure(true) is default, cookies set as secure, only transmitted when https
-                    // .cookie_http_only(true) is default, no javascript access to cookies
-                    // .cookie_content_security(CookieContentSecurity::Private) is default, encrypted but not signed
                     .session_lifecycle(
                         PersistentSession::default().session_ttl(cookie::time::Duration::hours(2)),
                     )

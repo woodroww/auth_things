@@ -12,8 +12,6 @@ use sqlx::{postgres::{PgSslMode, PgConnectOptions}, ConnectOptions};
 pub struct ApplicationSettings {
     pub port: String,
     pub host: String,
-    pub client_secret: String,
-    pub client_id: String,
     pub oauth_redirect_url: String,
     pub after_login_url: String,
     pub allowed_origins: Vec<String>,
@@ -26,6 +24,8 @@ pub struct OAuthProvider {
     pub oauth_url: String,
     pub token_url: String,
     pub revoke_url: String,
+    //pub client_secret: String,
+    //pub client_id: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
