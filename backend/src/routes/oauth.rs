@@ -221,7 +221,7 @@ pub struct LoginRedirect {
 #[actix_web::get("/oauth-redirect/local")]
 pub async fn localhost_redirect(/*request: HttpRequest*/) -> Result<HttpResponse, actix_web::Error> {
     Ok(HttpResponse::Found()
-        .append_header((actix_web::http::header::LOCATION, "http://127.0.0.1:3000/oauth-redirect"))
+        .append_header((actix_web::http::header::LOCATION, "http://127.0.0.1:3000/api/v1/oauth-redirect"))
         .content_type(ContentType::html())
         .finish())
 }
