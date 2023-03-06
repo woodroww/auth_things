@@ -1,9 +1,9 @@
 application:
-  host: localhost
-    # http://localhost:3000/api/v1/oauth-redirect
+  host: 127.0.0.1
+    # http://127.0.0.1:3000/api/v1/oauth-redirect
   oauth_redirect_url: https://portfolio.baeuerlin.net/api/v1/oauth-redirect/local 
-  after_login_url: http://localhost:8080/login-success
+  after_login_url: http://127.0.0.1:8080/login-success
   allowed_origins:
-    - http://localhost:8080
-    - http://localhost:3000
+    - http://127.0.0.1:8080
+    - http://127.0.0.1:3000
     - http://aquiles.local:9011
