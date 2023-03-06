@@ -94,6 +94,7 @@ pub async fn request_login_uri(
     // Save the state token to verify later.
     session.set_state(csrf_token)?;
 
+    tracing::info!("login: {}", Into::<String>::into(auth_url.clone()));
     // send back the link to the auth provider
     Ok(HttpResponse::Found()
         .append_header((actix_web::http::header::LOCATION, Into::<String>::into(auth_url)))
@@ -220,7 +221,8 @@ pub struct LoginRedirect {
 
 #[actix_web::get("/oauth-redirect/local")]
 pub async fn localhost_redirect(/*request: HttpRequest*/) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Found()
+    tracing::info!("localhost_redirect");
+    Ok(HttpResponse::SeeOther()
         .append_header((actix_web::http::header::LOCATION, "http://127.0.0.1:3000/api/v1/oauth-redirect"))
         .content_type(ContentType::html())
         .finish())

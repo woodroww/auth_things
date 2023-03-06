@@ -21,6 +21,7 @@ async fn main() -> std::io::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
+    tracing::info!("redirect_url: {}", configuration.application.oauth_redirect_url.clone());
     let mut clients = HashMap::new();
     for provider in configuration.application.oauth_providers {
         let client_id_key = format!("{}_CLIENT_ID", provider.name.to_uppercase());
