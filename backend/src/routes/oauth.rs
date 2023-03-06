@@ -7,10 +7,7 @@ use actix_web::{http::header::ContentType, web, HttpResponse, cookie::{
 use oauth2::{basic::BasicTokenType, /*StandardRevocableToken*/};
 use oauth2::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, StandardTokenResponse, TokenResponse};
-use oauth2::{basic::BasicClient, RevocationUrl};
-
-// use secrecy::ExposeSecret;
-use serde_json::Value;
+use oauth2::basic::BasicClient;
 
 #[actix_web::get("/client-login/{service}")]
 pub async fn request_login_uri(
@@ -219,6 +216,14 @@ pub async fn receive_token(
 pub struct LoginRedirect {
     code: String,
     state: String,
+}
+
+#[actix_web::get("/oauth-redirect/local")]
+pub async fn localhost_redirect(/*request: HttpRequest*/) -> Result<HttpResponse, actix_web::Error> {
+    Ok(HttpResponse::Found()
+        .append_header((actix_web::http::header::LOCATION, "http://127.0.1.1:3000/oauth-redirect"))
+        .content_type(ContentType::html())
+        .finish())
 }
 
 #[actix_web::get("/oauth-redirect")]
