@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GoogleAuth {
-    id_token: String,
+    pub id_token: String,
 }
 
 impl ExtraTokenFields for GoogleAuth {}
@@ -33,3 +33,20 @@ pub enum AuthName {
     #[strum(serialize="fusion")]
     Fusion,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct GoogleClaims {
+  pub aud: String,
+  pub email: String,
+  pub email_verified: bool,
+  pub exp: usize,
+  pub family_name: String,
+  pub given_name: String,
+  pub iat: usize,
+  pub iss: String,
+  pub locale: String,
+  pub name: String,
+  pub picture: String,
+  pub sub: String,
+}
+

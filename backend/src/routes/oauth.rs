@@ -1,4 +1,6 @@
-use crate::auth::{AuthClientType, GoogleClient, GoogleAuth};
+use std::collections::HashMap;
+
+use crate::auth::{AuthClientType, GoogleAuth, GoogleClaims, GoogleClient};
 use crate::session_state::TypedSession;
 use crate::{auth::AuthName, YogaAppData};
 use actix_web::{
@@ -9,6 +11,7 @@ use actix_web::{
     http::header::ContentType,
     web, HttpResponse,
 };
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, TokenData};
 use oauth2::{
     basic::{BasicClient, BasicTokenType},
     AccessToken, TokenIntrospectionResponse,
@@ -22,7 +25,6 @@ pub async fn request_login_uri(
     session: TypedSession,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    tracing::info!("request_login_uri");
     let oauth_provider: AuthName = match path.into_inner().as_str().try_into() {
         Ok(name) => name,
         Err(_) => {
@@ -30,7 +32,6 @@ pub async fn request_login_uri(
             return Ok(HttpResponse::InternalServerError().body("oauth provider not in map"));
         }
     };
-    tracing::info!("oauth_provider {:?}", oauth_provider);
 
     // OAuth flow
     // 2. The client (this app) redirects browser to the authorization server.
@@ -52,6 +53,7 @@ pub async fn request_login_uri(
                         .add_scope(Scope::new("openid".to_string()))
                         .add_scope(Scope::new("profile".to_string()))
                         .add_scope(Scope::new("email".to_string()))
+                        .add_extra_param("access_type", "offline")
                         .set_pkce_challenge(pkce_challenge)
                         .url()
                 } else {
@@ -66,12 +68,12 @@ pub async fn request_login_uri(
             match app_data.oauth_clients.get(&oauth_provider) {
                 Some(client) => {
                     session.insert_oauth_provider(AuthName::Fusion)?;
-                    if let AuthClientType::Google(fusion_client) = client {
+                    if let AuthClientType::Basic(fusion_client) = client {
                         fusion_client
                             .authorize_url(CsrfToken::new_random)
                             .add_scope(Scope::new("read".to_string()))
                             .add_scope(Scope::new("write".to_string()))
-                            //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
+                            .add_scope(Scope::new("offline".to_string())) // refresh tokens
                             .set_pkce_challenge(pkce_challenge)
                             .url()
                     } else {
@@ -83,33 +85,30 @@ pub async fn request_login_uri(
                 }
             }
         }
-        AuthName::GitHub => {
-            match app_data.oauth_clients.get(&oauth_provider) {
-                Some(client) => {
-                    session.insert_oauth_provider(AuthName::GitHub)?;
-                    if let AuthClientType::Google(github_client) = client {
-                        github_client
-                            .authorize_url(CsrfToken::new_random)
-                            .add_scope(Scope::new("read".to_string()))
-                            .add_scope(Scope::new("write".to_string()))
-                            //.add_scope(Scope::new("offline_access".to_string())) // refresh tokens
-                            .set_pkce_challenge(pkce_challenge)
-                            .url()
-                    } else {
-                        panic!();
-                    }
-                }
-                None => {
-                    return Ok(HttpResponse::InternalServerError().body("oauth provider not in map"))
+        AuthName::GitHub => match app_data.oauth_clients.get(&oauth_provider) {
+            Some(client) => {
+                session.insert_oauth_provider(AuthName::GitHub)?;
+                if let AuthClientType::Basic(github_client) = client {
+                    github_client
+                        .authorize_url(CsrfToken::new_random)
+                        .add_scope(Scope::new("read".to_string()))
+                        .add_scope(Scope::new("write".to_string()))
+                        .set_pkce_challenge(pkce_challenge)
+                        .url()
+                } else {
+                    panic!();
                 }
             }
-        }
+            None => {
+                return Ok(HttpResponse::InternalServerError().body("oauth provider not in map"))
+            }
+        },
     };
 
     // Save the state token to verify later.
     session.set_state(csrf_token)?;
 
-    tracing::info!("login: {}", Into::<String>::into(auth_url.clone()));
+    //tracing::info!("login: {}", Into::<String>::into(auth_url.clone()));
     // send back the link to the auth provider
     Ok(HttpResponse::Found()
         .append_header((
@@ -118,22 +117,6 @@ pub async fn request_login_uri(
         ))
         .body(""))
 }
-
-/*
-fn manual_exchange<'a>(session: &TypedSession, app_data: &'a web::Data<YogaAppData>, code: String) {
-    let oauth_client = match oauth_client(&session, &app_data) {
-        Some(client) => {
-            let url = client.token_url().unwrap().url().to_string();
-            let client_id = client.client_id().to_string();
-            let client_secret = client.
-
-        }
-        None => {
-        }
-    };
-
-}
-    */
 
 fn oauth_client<'a>(
     session: &TypedSession,
@@ -207,7 +190,7 @@ async fn introspect(
     session: TypedSession,
     app_data: web::Data<YogaAppData>,
 ) -> Result<(), actix_web::Error> {
-    let client = match oauth_client(&session, &app_data) {
+    match oauth_client(&session, &app_data) {
         Some(client) => match client {
             AuthClientType::Google(google) => match google.introspect(access_token) {
                 Ok(request) => {
@@ -247,55 +230,8 @@ async fn introspect(
             },
         },
         None => {}
-    };
-    Ok(())
-}
-
-async fn receive_token(
-    app_data: web::Data<YogaAppData>,
-    token: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
-    session: TypedSession,
-) -> Result<HttpResponse, actix_web::Error> {
-    // oauth flow
-    // 8. The client doesn't understand the token but can use it to send requests to the resource server
-
-    tracing::info!("matts fun token:\n{:#?}", token);
-
-    // The access token issued by the authorization server.
-    let jwt = token.access_token();
-    session.set_access_token(jwt.clone())?;
-
-    let extra = token.extra_fields();
-    tracing::info!("matts fun extra_fields:\n{:#?}", extra);
-
-    //let token_type = token.token_type();
-    //let expires_in = token.expires_in();
-
-    match token.refresh_token() {
-        Some(refresh) => {
-            session.set_refresh_token(refresh.clone())?;
-            tracing::info!("got a refresh token");
-        }
-        None => {
-            tracing::info!("didn't got a refresh token");
-        }
     }
-
-    let after_login_url = app_data.after_login_url.clone();
-    let what = introspect(jwt, session, app_data).await?;
-
-    // back to frontend
-    let cookie = Cookie::build("access_token", jwt.secret())
-        .path("/")
-        .same_site(SameSite::Strict)
-        .expires(OffsetDateTime::now_utc().checked_add(Duration::minutes(60)))
-        .finish();
-
-    Ok(HttpResponse::Found()
-        .append_header((actix_web::http::header::LOCATION, after_login_url))
-        .content_type(ContentType::html())
-        .cookie(cookie)
-        .finish())
+    Ok(())
 }
 
 #[derive(serde::Deserialize)]
@@ -311,7 +247,7 @@ pub async fn oauth_login_redirect(
     //request: HttpRequest,
     session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
-    tracing::info!("oauth_login_redirect");
+    //tracing::info!("oauth_login_redirect");
     // OAuth flow
     // 5. The authorization server redirects back to the client using the redirect uri. Along with
     //    a temporary authorization code.
@@ -321,8 +257,6 @@ pub async fn oauth_login_redirect(
     // state - this is the same value of the state parameter we passed to the OAuth server
     // this is echoed back to this application so that we can verify that the code
     // came from the correct location
-
-    let mut error_str = String::new();
 
     if let (Ok(Some(state)), Ok(Some(verifier))) =
         (session.get_state(), session.get_pkce_verifier())
@@ -344,19 +278,32 @@ pub async fn oauth_login_redirect(
         match oauth_client(&session, &app_data) {
             Some(oauth_client) => match oauth_client {
                 AuthClientType::Basic(basic) => {
-                    return basic_exchange(app_data.clone(), session, login.code.clone(), verifier, basic).await;
+                    return basic_exchange(
+                        app_data.clone(),
+                        session,
+                        login.code.clone(),
+                        verifier,
+                        basic,
+                    )
+                    .await;
                 }
                 AuthClientType::Google(google) => {
-                    return google_exchange(app_data.clone(), session, login.code.clone(), verifier, google).await;
+                    return google_exchange(
+                        app_data.clone(),
+                        session,
+                        login.code.clone(),
+                        verifier,
+                        google,
+                    )
+                    .await;
                 }
             },
             None => {
                 panic!();
             }
         }
-    } else {
-        error_str = session_error(session);
     }
+    let error_str = session_error(session);
     // this is going to be the error response
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
@@ -397,6 +344,67 @@ fn session_error(session: TypedSession) -> String {
     error_str
 }
 
+async fn basic_exchange(
+    app_data: web::Data<YogaAppData>,
+    session: TypedSession,
+    code: String,
+    verifier: PkceCodeVerifier,
+    basic: &BasicClient,
+) -> Result<HttpResponse, actix_web::Error> {
+    let token_response = basic
+        .exchange_code(AuthorizationCode::new(code))
+        .set_pkce_verifier(verifier)
+        .request_async(oauth2::reqwest::async_http_client)
+        .await;
+
+    if let Ok(token) = token_response {
+        // this is the happy path
+        return receive_token(app_data, token, session).await;
+    } else {
+        // TODO error_str.push_str("<p>did not exchage code for token_response</p>")
+        panic!()
+    }
+}
+
+async fn receive_token(
+    app_data: web::Data<YogaAppData>,
+    token: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
+    session: TypedSession,
+) -> Result<HttpResponse, actix_web::Error> {
+    // oauth flow
+    // 8. The client doesn't understand the token but can use it to send requests to the resource server
+
+    //tracing::info!("matts fun token:\n{:#?}", token);
+
+    // The access token issued by the authorization server.
+    let jwt = token.access_token();
+    session.set_access_token(jwt.clone())?;
+
+    //let extra = token.extra_fields();
+    //let token_type = token.token_type();
+    //let expires_in = token.expires_in();
+
+    if let Some(refresh) = token.refresh_token() {
+        session.set_refresh_token(refresh.clone())?;
+    }
+
+    let after_login_url = app_data.after_login_url.clone();
+    //let what = introspect(jwt, session, app_data).await?;
+
+    // back to frontend
+    let cookie = Cookie::build("access_token", jwt.secret())
+        .path("/")
+        .same_site(SameSite::Strict)
+        .expires(OffsetDateTime::now_utc().checked_add(Duration::minutes(60)))
+        .finish();
+
+    Ok(HttpResponse::Found()
+        .append_header((actix_web::http::header::LOCATION, after_login_url))
+        .content_type(ContentType::html())
+        .cookie(cookie)
+        .finish())
+}
+
 async fn google_exchange(
     app_data: web::Data<YogaAppData>,
     session: TypedSession,
@@ -421,29 +429,6 @@ async fn google_exchange(
     }
 }
 
-async fn basic_exchange(
-    app_data: web::Data<YogaAppData>,
-    session: TypedSession,
-    code: String,
-    verifier: PkceCodeVerifier,
-    basic: &BasicClient,
-) -> Result<HttpResponse, actix_web::Error> {
-    let token_response = basic
-        .exchange_code(AuthorizationCode::new(code))
-        .set_pkce_verifier(verifier)
-        .request_async(oauth2::reqwest::async_http_client)
-        .await;
-
-    if let Ok(token) = token_response {
-        // this is the happy path
-        return receive_token(app_data, token, session).await;
-    } else {
-        // TODO error_str.push_str("<p>did not exchage code for token_response</p>")
-        panic!()
-    }
-}
-
-
 async fn receive_google_token(
     app_data: web::Data<YogaAppData>,
     token: StandardTokenResponse<GoogleAuth, BasicTokenType>,
@@ -452,14 +437,21 @@ async fn receive_google_token(
     // oauth flow
     // 8. The client doesn't understand the token but can use it to send requests to the resource server
 
-    tracing::info!("matts fun token:\n{:#?}", token);
+    //tracing::info!("matts fun token:\n{:#?}", token);
 
     // The access token issued by the authorization server.
     let jwt = token.access_token();
     session.set_access_token(jwt.clone())?;
 
-    let extra = token.extra_fields();
-    tracing::info!("matts fun extra_fields:\n{:#?}", extra);
+    let extra: &GoogleAuth = token.extra_fields();
+    match verify_google_id_token(&extra.id_token).await {
+        Ok(claims) => {
+            tracing::info!("verify reqwest ok {:#?}", claims);
+        }
+        Err(error) => {
+            tracing::error!("verify reqwest error {}", error);
+        }
+    }
 
     //let token_type = token.token_type();
     //let expires_in = token.expires_in();
@@ -467,15 +459,12 @@ async fn receive_google_token(
     match token.refresh_token() {
         Some(refresh) => {
             session.set_refresh_token(refresh.clone())?;
-            tracing::info!("got a refresh token");
         }
-        None => {
-            tracing::info!("didn't got a refresh token");
-        }
+        None => {}
     }
 
     let after_login_url = app_data.after_login_url.clone();
-    let what = introspect(jwt, session, app_data).await?;
+    //let what = introspect(jwt, session, app_data).await?;
 
     // back to frontend
     let cookie = Cookie::build("access_token", jwt.secret())
@@ -490,3 +479,81 @@ async fn receive_google_token(
         .cookie(cookie)
         .finish())
 }
+
+// An ID Token is a JWT (JSON Web Token), that is, a cryptographically signed Base64-encoded JSON object.
+// You need to validate all ID tokens on your server unless you know that they came directly from Google
+// The Discovery document for Google's OpenID Connect service may be retrieved from:
+// https://accounts.google.com/.well-known/openid-configuration
+// get the urls from this document, it has the auth and token endpoints too
+// Google-issued tokens are signed using one of the certificates found at the URI specified in
+// the jwks_uri metadata value of the Discovery document.
+// "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+// jwks_uri lists keys each with:
+// alg kty n e use kid
+
+// kid = the ID of the key used to sign this token
+// the id_token header should have a kid indicating the correct key in the jwks
+
+#[derive(thiserror::Error, Debug)]
+pub enum VerifyTokenError {
+    #[error("reqwest error")]
+    ReqwestError(#[from] reqwest::Error),
+    #[error("id_token has no kid")]
+    NoKid,
+    #[error("id-token header kid not found in jwks")]
+    KidNotFound,
+    #[error("jsonwebtoken error")]
+    JsonwebTokenError(#[from] jsonwebtoken::errors::Error),
+}
+
+async fn verify_google_id_token(id_token: &str) -> Result<GoogleClaims, VerifyTokenError> {
+    let jwks = reqwest::get("https://www.googleapis.com/oauth2/v3/certs")
+        .await?
+        .json::<HashMap<String, Vec<HashMap<String, String>>>>()
+        .await?;
+    let header = jsonwebtoken::decode_header(&id_token).unwrap();
+    if let Some(token_kid) = header.kid {
+        let jwks_keys = jwks.get("keys").unwrap();
+        for key in jwks_keys {
+            match key.get("kid") {
+                Some(kid) => {
+                    if kid == &token_kid {
+                        let modulus = key.get("n").unwrap();
+                        let exponent = key.get("e").unwrap();
+                        match jsonwebtoken::decode::<GoogleClaims>(
+                            &id_token,
+                            &DecodingKey::from_rsa_components(modulus, exponent).expect("this to work"),
+                            &Validation::new(Algorithm::RS256),
+                        ) {
+                            Ok(token) => {
+                                let token: TokenData<GoogleClaims> = token;
+                                return Ok(token.claims);
+                            }
+                            Err(err) => {
+                                tracing::error!("jsonwebtoken error {}", err);
+                                return Err(VerifyTokenError::JsonwebTokenError(err));
+                            }
+                        };
+                    }
+                }
+                None => {
+                }
+            }
+        }
+        return Err(VerifyTokenError::KidNotFound);
+    } else {
+        tracing::error!("id_token has no kid in header");
+        return Err(VerifyTokenError::NoKid);
+    }
+}
+
+
+    /*
+    use base64::{Engine as _, alphabet, engine::{self, general_purpose}};
+    let bytes = engine::GeneralPurpose::new(
+        &alphabet::URL_SAFE,
+        general_purpose::NO_PAD)
+        .decode(id_token).unwrap();
+    println!("BYTES!!!\n{:?}", bytes);
+    */
+
