@@ -6,20 +6,23 @@ application:
       oauth_url: http://aquiles.local:9011/oauth2/authorize
       token_url: http://aquiles.local:9011/oauth2/token
       revoke_url: http://aquiles.local:9011/revoke
+      introspection_url: http://aquiles.local:9011/introspect
     -
       name: google
       oauth_url: https://accounts.google.com/o/oauth2/v2/auth
       token_url: https://oauth2.googleapis.com/token
       revoke_url: https://oauth2.googleapis.com/revoke
+      introspection_url: https://openidconnect.googleapis.com/v1/userinfo
     -
       name: github
       oauth_url: https://github.com/login/oauth/authorize
       token_url: https://github.com/login/oauth/access_token
       revoke_url: https://github.com/login/oauth/idontknowrevoke
+      introspection_url: https://github.com/login/oauth/idontknow
 database:
-  username: "postgres"
-  password: "password"
+  username: "matt"
+  password: ""
   port: 5432
   host: "localhost"
-  database_name: "newsletter"
+  database_name: "site_users"
   require_ssl: false

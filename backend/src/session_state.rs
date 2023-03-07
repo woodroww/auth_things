@@ -5,6 +5,8 @@ use oauth2::{CsrfToken, PkceCodeVerifier, AccessToken, RefreshToken};
 use std::future::{ready, Ready};
 use uuid::Uuid;
 
+use crate::auth::AuthName;
+
 pub struct TypedSession(Session);
 
 impl TypedSession {
@@ -15,10 +17,10 @@ impl TypedSession {
     const USER_ID_KEY: &'static str = "user_id";
     const OAUTH_PROVIDER_KEY: &'static str = "oauth_provider";
 
-    pub fn insert_oauth_provider(&self, provider: String) -> Result<(), SessionInsertError> {
+    pub fn insert_oauth_provider(&self, provider: AuthName) -> Result<(), SessionInsertError> {
         self.0.insert(Self::OAUTH_PROVIDER_KEY, provider)
     }
-    pub fn get_oauth_provider(&self) -> Result<Option<String>, SessionGetError> {
+    pub fn get_oauth_provider(&self) -> Result<Option<AuthName>, SessionGetError> {
         self.0.get(Self::OAUTH_PROVIDER_KEY)
     }
 

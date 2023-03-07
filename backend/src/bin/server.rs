@@ -4,13 +4,13 @@ use actix_web::{
     cookie::{self, Key},
     http, web, App, HttpServer,
 };
-use backend::configuration::{get_configuration, DatabaseSettings};
+use backend::{configuration::{get_configuration, ApplicationSettings}, database::YogaDatabase, auth::{AuthClientType, AuthName}};
 use backend::YogaAppData;
-use oauth2::{basic::BasicClient, RevocationUrl};
+use oauth2::{basic::BasicClient, RevocationUrl, IntrospectionUrl};
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
-use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::collections::HashMap;
 use tracing_actix_web::TracingLogger;
+use backend::auth::GoogleClient;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -22,41 +22,11 @@ async fn main() -> std::io::Result<()> {
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
     tracing::info!("redirect_url: {}", configuration.application.oauth_redirect_url.clone());
-    let mut clients = HashMap::new();
-    for provider in configuration.application.oauth_providers {
-        let client_id_key = format!("{}_CLIENT_ID", provider.name.to_uppercase());
-        let client_id = match std::env::var(client_id_key.clone()) {
-            Ok(value) => Some(value),
-            Err(_) => {
-                tracing::error!("couldn't get {} from environment", client_id_key);
-                None
-            }
-        };
-        let client_secret_key = format!("{}_CLIENT_SECRET", provider.name.to_uppercase());
-        let client_secret = match std::env::var(client_secret_key.clone()) {
-            Ok(value) => Some(value),
-            Err(_) => {
-                tracing::error!("couldn't get {} from environment", client_secret_key);
-                None
-            }
-        };
-        if let (Some(id), Some(secret)) = (client_id, client_secret) {
-            let client = BasicClient::new(
-                ClientId::new(id),
-                Some(ClientSecret::new(secret)),
-                AuthUrl::new(provider.oauth_url).unwrap(),
-                Some(TokenUrl::new(provider.token_url).unwrap()),
-            )
-            .set_redirect_uri(
-                RedirectUrl::new(configuration.application.oauth_redirect_url.clone()).unwrap(),
-            )
-            .set_revocation_uri(RevocationUrl::new(provider.revoke_url).unwrap());
-            clients.insert(provider.name, client);
-        }
-    }
 
-    let connection_pool = get_connection_pool(&configuration.database);
-    let db_pool = web::Data::new(connection_pool);
+    let database = YogaDatabase::new(configuration.database);
+    let db = web::Data::new(database);
+
+    let clients = setup_auth_providers(&configuration.application);
 
     let yoga_data = web::Data::new(YogaAppData {
         oauth_clients: clients,
@@ -108,7 +78,7 @@ async fn main() -> std::io::Result<()> {
                     .service(backend::routes::poses::look_at_poses)
             )
             .app_data(yoga_data.clone())
-            .app_data(db_pool.clone())
+            .app_data(db.clone())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
                     .session_lifecycle(
@@ -123,8 +93,63 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
-pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
-    PgPoolOptions::new()
-        .acquire_timeout(std::time::Duration::from_secs(2))
-        .connect_lazy_with(configuration.with_db())
+fn setup_auth_providers(application: &ApplicationSettings) -> HashMap<AuthName, AuthClientType> {
+    let mut clients = HashMap::new();
+    for provider in application.oauth_providers.iter() {
+        let client_id_key = format!("{}_CLIENT_ID", provider.name.to_uppercase());
+        let client_id = match std::env::var(client_id_key.clone()) {
+            Ok(value) => Some(value),
+            Err(_) => {
+                tracing::error!("couldn't get {} from environment", client_id_key);
+                None
+            }
+        };
+        let client_secret_key = format!("{}_CLIENT_SECRET", provider.name.to_uppercase());
+        let client_secret = match std::env::var(client_secret_key.clone()) {
+            Ok(value) => Some(value),
+            Err(_) => {
+                tracing::error!("couldn't get {} from environment", client_secret_key);
+                None
+            }
+        };
+        if let (Some(id), Some(secret)) = (client_id, client_secret) {
+            let auth_name: AuthName = match provider.name.as_str().try_into() {
+                Ok(name) => name,
+                Err(_) => {
+                    tracing::error!("invalid auth provider name");
+                    continue;
+                }
+            };
+            match auth_name {
+                AuthName::Google => {
+                    let google_client = GoogleClient::new(
+                        ClientId::new(id),
+                        Some(ClientSecret::new(secret)),
+                        AuthUrl::new(provider.oauth_url.clone()).unwrap(),
+                        Some(TokenUrl::new(provider.token_url.clone()).unwrap()),
+                    ).set_redirect_uri(
+                            RedirectUrl::new(application.oauth_redirect_url.clone()).unwrap(),
+                        )
+                        .set_revocation_uri(RevocationUrl::new(provider.revoke_url.clone()).unwrap())
+                        .set_introspection_uri(IntrospectionUrl::new(provider.introspection_url.clone()).unwrap());
+                    clients.insert(auth_name, AuthClientType::Google(google_client));
+                },
+                AuthName::GitHub | AuthName::Fusion => {
+                    let client = BasicClient::new(
+                        ClientId::new(id),
+                        Some(ClientSecret::new(secret)),
+                        AuthUrl::new(provider.oauth_url.clone()).unwrap(),
+                        Some(TokenUrl::new(provider.token_url.clone()).unwrap()),
+                    )
+                        .set_redirect_uri(
+                            RedirectUrl::new(application.oauth_redirect_url.clone()).unwrap(),
+                        )
+                        .set_revocation_uri(RevocationUrl::new(provider.revoke_url.clone()).unwrap())
+                        .set_introspection_uri(IntrospectionUrl::new(provider.introspection_url.clone()).unwrap());
+                    clients.insert(auth_name, AuthClientType::Basic(client));
+                }
+            }
+        }
+    }
+    clients
 }

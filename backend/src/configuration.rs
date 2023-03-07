@@ -24,6 +24,7 @@ pub struct OAuthProvider {
     pub oauth_url: String,
     pub token_url: String,
     pub revoke_url: String,
+    pub introspection_url: String,
     //pub client_secret: String,
     //pub client_id: String,
 }
