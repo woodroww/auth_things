@@ -465,6 +465,9 @@ async fn receive_google_token(
 
     let after_login_url = app_data.after_login_url.clone();
     //let what = introspect(jwt, session, app_data).await?;
+    
+    // does this belong here? it belongs somewhere
+    session.renew();
 
     // back to frontend
     let cookie = Cookie::build("access_token", jwt.secret())
