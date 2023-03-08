@@ -50,3 +50,15 @@ pub struct GoogleClaims {
   pub sub: String,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum VerifyTokenError {
+    #[error("reqwest error")]
+    ReqwestError(#[from] reqwest::Error),
+    #[error("id_token has no kid")]
+    NoKid,
+    #[error("id-token header kid not found in jwks")]
+    KidNotFound,
+    #[error("jsonwebtoken error")]
+    JsonwebTokenError(#[from] jsonwebtoken::errors::Error),
+}
+

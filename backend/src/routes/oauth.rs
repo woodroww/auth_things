@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::auth::{AuthClientType, GoogleAuth, GoogleClaims, GoogleClient};
+use crate::auth::{AuthClientType, GoogleAuth, GoogleClaims, GoogleClient, VerifyTokenError};
 use crate::session_state::TypedSession;
 use crate::{auth::AuthName, YogaAppData};
 use actix_web::{
@@ -388,6 +388,9 @@ async fn receive_token(
         session.set_refresh_token(refresh.clone())?;
     }
 
+    // does this belong here? it belongs somewhere
+    session.renew();
+
     let after_login_url = app_data.after_login_url.clone();
     //let what = introspect(jwt, session, app_data).await?;
 
@@ -496,18 +499,6 @@ async fn receive_google_token(
 
 // kid = the ID of the key used to sign this token
 // the id_token header should have a kid indicating the correct key in the jwks
-
-#[derive(thiserror::Error, Debug)]
-pub enum VerifyTokenError {
-    #[error("reqwest error")]
-    ReqwestError(#[from] reqwest::Error),
-    #[error("id_token has no kid")]
-    NoKid,
-    #[error("id-token header kid not found in jwks")]
-    KidNotFound,
-    #[error("jsonwebtoken error")]
-    JsonwebTokenError(#[from] jsonwebtoken::errors::Error),
-}
 
 async fn verify_google_id_token(id_token: &str) -> Result<GoogleClaims, VerifyTokenError> {
     let jwks = reqwest::get("https://www.googleapis.com/oauth2/v3/certs")
